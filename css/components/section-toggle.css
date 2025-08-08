@@ -1,0 +1,62 @@
+/* Section Toggle Component Styles */
+
+.section-header {
+    position: relative;
+}
+
+.section-toggle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--primary-dark);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.section-toggle:hover {
+    background: var(--light-gray);
+}
+
+.section-toggle .toggle-icon {
+    transition: transform 0.3s ease;
+    width: 16px;
+    height: 16px;
+    display: block;
+    background: url('../../images/chevron.svg') no-repeat center center;
+    background-size: contain;
+    transform: rotate(90deg);
+}
+
+.workflow-section.collapsed .section-toggle .toggle-icon {
+    transform: rotate(0deg);
+}
+
+/* Collapsed section styles */
+.workflow-section.collapsed .section-content {
+    display: none;
+}
+
+.workflow-section.collapsed h2 {
+    margin-bottom: 0;
+}
+
+/* Disable collapse functionality for disabled sections */
+.workflow-section.disabled .section-toggle {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Make sure active sections that are collapsed can still be styled properly */
+.workflow-section.collapsed.active {
+    border-left: 4px solid var(--primary-accent);
+    box-shadow: var(--shadow-medium);
+}

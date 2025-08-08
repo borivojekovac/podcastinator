@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcastinator - Document to Podcast Converter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Podcastinator <img src="images/play.svg" alt="Podcast" class="header-icon"></h1>
+            <p>Transform your documents into engaging audio podcasts</p>
+        </header>
+
+        <main>
+            <!-- Section 1: OpenAI API Credentials -->
+            <section id="credentials-section" class="workflow-section active">
+                <h2>
+                    <span class="step-number">1</span>
+                    AI Parameters
+                </h2>
+                <div class="section-content">
+                    <p>Configure your OpenAI API settings and select models for different tasks</p>
+                    
+                    <!-- API Key Input -->
+                    <form id="api-key-form" onsubmit="return false;">
+                        <div class="form-group">
+                            <label for="api-key">Open AI API Key:</label>
+                            <input type="password" id="api-key" placeholder="sk-..." />
+                        </div>
+                    </form>
+
+                    <!-- Model Selection Grid -->
+                    <div class="model-selection-grid">
+                        <!-- Left Column -->
+                        <div class="model-group left-column">
+                            
+                            <div class="form-group">
+                                <label for="backstory-model">Character Backstories:</label>
+                                <select id="backstory-model">
+                                    <option value="gpt-4.1">GPT-4.1 (1Mt context)</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1 mini (1Mt context)</option>
+                                    <option value="gpt-4.1-nano">GPT-4.1 nano (1Mt context)</option>
+                                    <option value="o3">o3 (200kt context)</option>
+                                    <option value="o4-mini">o4-mini (200kt context)</option>
+                                    <option value="gpt-4o">GPT-4o (128kt context)</option>
+                                    <option value="gpt-4o-mini" selected>GPT-4o mini (128kt context)</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (4kt contextxt)</option>
+                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16k (16kt context)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="outline-model">Outline Generation:</label>
+                                <select id="outline-model">
+                                    <option value="gpt-4.1">GPT-4.1 (1Mt context)</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1 mini (1Mt context)</option>
+                                    <option value="gpt-4.1-nano">GPT-4.1 nano (1Mt context)</option>
+                                    <option value="o3">o3 (200kt context)</option>
+                                    <option value="o4-mini">o4-mini (200kt context)</option>
+                                    <option value="gpt-4o">GPT-4o (128kt context)</option>
+                                    <option value="gpt-4o-mini" selected>GPT-4o mini (128kt context)</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (4kt context)</option>
+                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16k (16kt context)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="outline-verify-model">Outline Editing:</label>
+                                <select id="outline-verify-model">
+                                    <option value="gpt-4.1">GPT-4.1 (1Mt context)</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1 mini (1Mt context)</option>
+                                    <option value="gpt-4.1-nano">GPT-4.1 nano (1Mt context)</option>
+                                    <option value="o3">o3 (200kt context)</option>
+                                    <option value="o4-mini">o4-mini (200kt context)</option>
+                                    <option value="gpt-4o" selected>GPT-4o (128kt context)</option>
+                                    <option value="gpt-4o-mini">GPT-4o mini (128kt context)</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (4kt context)</option>
+                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16k (16kt context)</option>
+                                </select>
+                            </div>
+
+                            <!-- Vertical Divider -->
+                            <div class="vertical-divider"></div>
+                            
+                        </div>
+
+                        <!-- Right Column -->
+                        <div class="model-group right-column">
+
+                            <div class="form-group">
+                                <label for="script-model">Script Generation:</label>
+                                <select id="script-model">
+                                    <option value="gpt-4.1">GPT-4.1 (1Mt context)</option>
+                                    <option value="gpt-4.1-mini" selected>GPT-4.1 mini (1Mt context)</option>
+                                    <option value="gpt-4.1-nano">GPT-4.1 nano (1Mt context)</option>
+                                    <option value="o3">o3 (200kt context)</option>
+                                    <option value="o4-mini">o4-mini (200kt context)</option>
+                                    <option value="gpt-4o">GPT-4o (128kt context)</option>
+                                    <option value="gpt-4o-mini">GPT-4o mini (128kt context)</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (4kt context)</option>
+                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16k (16kt context)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="script-verify-model">Script Editing:</label>
+                                <select id="script-verify-model">
+                                    <option value="gpt-4.1" selected>GPT-4.1 (1Mt context)</option>
+                                    <option value="gpt-4.1-mini">GPT-4.1 mini (1Mt context)</option>
+                                    <option value="gpt-4.1-nano">GPT-4.1 nano (1Mt context)</option>
+                                    <option value="o3">o3 (200kt context)</option>
+                                    <option value="o4-mini">o4-mini (200kt context)</option>
+                                    <option value="gpt-4o">GPT-4o (128kt context)</option>
+                                    <option value="gpt-4o-mini">GPT-4o mini (128kt context)</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (4kt context)</option>
+                                    <option value="gpt-3.5-turbo-16k">GPT-3.5 Turbo 16k (16kt context)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="tts-model">Text-to-Speech:</label>
+                                <select id="tts-model">
+                                    <option value="tts-1" selected>TTS-1 (Standard)</option>
+                                    <option value="tts-1-hd">TTS-1 HD (High Quality)</option>
+                                    <option value="gpt-4o-mini-tts">GPT-4o Mini TTS</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="validate-key" class="btn-primary">
+                            <span id="validate-text">Validate & Save</span>
+                            <span id="validate-spinner" class="spinner" style="display: none;"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2: Document Upload -->
+            <section id="upload-section" class="workflow-section disabled">
+                <h2>
+                    <span class="step-number">2</span>
+                    Contents
+                </h2>
+                <div class="section-content">
+                    <p>Upload your document and configure podcast settings</p>
+                    <div class="upload-area" id="upload-area">
+                        <!-- Upload placeholder - shown by default -->
+                        <div class="upload-placeholder" id="upload-placeholder">
+                            <p>Drag and drop your document here</p>
+                            <p>or</p>
+                            <p>Click to browse</p>
+                            <input type="file" id="file-input" accept=".txt,.md,.markdown,text/plain,text/markdown" hidden />
+                        </div>
+                        
+                        <!-- Document preview - hidden by default -->
+                        <div class="document-preview hidden" id="document-preview">
+                            <div class="document-icon" id="document-icon"><img src="images/document.svg" alt="Document"></div>
+                            <div class="document-info">
+                                <div class="document-name" id="document-name"></div>
+                                <div class="document-meta">
+                                    <span id="document-size"></span>
+                                    <span>•</span>
+                                    <span id="document-date"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Loading state - hidden by default -->
+                        <div class="upload-loading hidden" id="upload-loading">
+                            <div class="spinner"></div>
+                            <p id="upload-loading-text">Processing document...</p>
+                        </div>
+                    </div>
+                    
+                    
+                    <!-- Podcast Configuration -->
+                    <div class="form-group full-width" style="margin-top: 20px;">
+                        <label for="podcast-focus">Podcast Focus / Steer (optional)</label>
+                        <textarea id="podcast-focus" rows="3" placeholder="Leave empty to focus on full document"></textarea>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="browse-file" class="btn-primary hidden">Browse</button>
+                        <button id="change-document" class="btn-primary hidden">Clear Document</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: Host Character Builder -->
+            <section id="host-section" class="workflow-section disabled">
+                <h2>
+                    <span class="step-number">3</span>
+                    Host Character
+                </h2>
+                <div class="section-content">
+                    <div class="character-builder">
+                        <!-- Basic Info -->
+                        <div class="form-group">
+                            <label for="host-name">Character Name:</label>
+                            <input type="text" id="host-name" placeholder="Enter host name" />
+                        </div>
+                        
+                        <!-- Personality Selection -->
+                        <div class="form-group">
+                            <label for="host-personality">Personality Type:</label>
+                            <select id="host-personality">
+                                <option value="">Select personality...</option>
+                                <!-- Options will be populated from JS -->
+                            </select>
+                        </div>
+                        
+                        <!-- Voice Selection -->
+                        <div class="form-group">
+                            <label for="host-voice">Voice Type:</label>
+                            <select id="host-voice">
+                                <option value="">Select voice...</option>
+                                <!-- Options will be populated from JS -->
+                            </select>
+                        </div>
+                        
+                        <!-- Speech Rate (visible only when TTS-1/TTS-1-HD is selected) -->
+                        <div class="form-group speech-rate-container" id="host-speech-rate-container" style="display: none;">
+                            <label for="host-speech-rate">Speech Rate: <span id="host-speech-rate-value">1.0</span>x</label>
+                            <div class="slider-container">
+                                <input type="range" id="host-speech-rate" min="-3" max="3" step="0.02" value="0" />
+                                <div class="slider-legend">
+                                    <span>Slower</span>
+                                    <span>Normal</span>
+                                    <span>Faster</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Voice Instructions (visible only when GPT-4o-mini-TTS is selected) -->
+                        <div class="form-group voice-instructions-container" id="host-voice-instructions-container" style="display: none;">
+                            <label for="host-voice-instructions-preset">Voice Instructions:</label>
+                            <select id="host-voice-instructions-preset">
+                                <option value="">Select instructions...</option>
+                                <option value="professional">Professional Podcast Host</option>
+                                <option value="enthusiastic">Enthusiastic and Energetic</option>
+                                <option value="calm">Calm and Soothing</option>
+                                <option value="authoritative">Authoritative Expert</option>
+                                <option value="conversational">Casual Conversational</option>
+                                <option value="dramatic">Dramatic Narrator</option>
+                                <option value="friendly">Friendly and Approachable</option>
+                                <option value="contemplative">Thoughtful and Contemplative</option>
+                                <option value="news">News Anchor Style</option>
+                                <option value="storytelling">Engaging Storyteller</option>
+                                <option value="educational">Educational Lecturer</option>
+                                <option value="custom">〈custom〉</option>
+                            </select>
+                            <textarea id="host-voice-instructions" rows="3" placeholder="Custom voice instructions will appear here. You can edit them directly."></textarea>
+                        </div>
+                        
+                        <!-- Character Preview (shown when character has data) -->
+                        <div class="character-preview" id="host-preview" style="display: none;">
+                            <h3>Host Character Preview</h3>
+                            <div class="character-traits" id="host-traits">
+                                <!-- Will be populated by JS -->
+                            </div>
+                            <div class="character-status complete" id="host-status">
+                                <span id="host-status-icon">✓</span> 
+                                <span id="host-status-text">Character complete</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Backstory Generation -->
+                        <div class="form-group">
+                            <label for="host-backstory-prompt">Generate Backstory:</label>
+                            <div class="backstory-prompt-container">
+                                <input type="text" id="host-backstory-prompt" placeholder="Brief description for backstory generation..." />
+                                <button id="generate-host-backstory" class="btn-secondary">Generate</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Backstory Text -->
+                        <div class="form-group">
+                            <label for="host-backstory">Character Backstory:</label>
+                            <textarea id="host-backstory" rows="6" placeholder="Enter or generate character backstory..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="save-host" class="btn-primary">Save Host Character</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 4: Guest Character Builder -->
+            <section id="guest-section" class="workflow-section disabled">
+                <h2>
+                    <span class="step-number">4</span>
+                    Guest Character
+                </h2>
+                <div class="section-content">
+                    <div class="character-builder">
+                        <!-- Basic Info -->
+                        <div class="form-group">
+                            <label for="guest-name">Character Name:</label>
+                            <input type="text" id="guest-name" placeholder="Enter guest name" />
+                        </div>
+                        
+                        <!-- Personality Selection -->
+                        <div class="form-group">
+                            <label for="guest-personality">Personality Type:</label>
+                            <select id="guest-personality">
+                                <option value="">Select personality...</option>
+                                <!-- Options will be populated from JS -->
+                            </select>
+                        </div>
+                        
+                        <!-- Voice Selection -->
+                        <div class="form-group">
+                            <label for="guest-voice">Voice Type:</label>
+                            <select id="guest-voice">
+                                <option value="">Select voice...</option>
+                                <!-- Options will be populated from JS -->
+                            </select>
+                        </div>
+                        
+                        <!-- Speech Rate (visible only when TTS-1/TTS-1-HD is selected) -->
+                        <div class="form-group speech-rate-container" id="guest-speech-rate-container" style="display: none;">
+                            <label for="guest-speech-rate">Speech Rate: <span id="guest-speech-rate-value">1.0</span>x</label>
+                            <div class="slider-container">
+                                <input type="range" id="guest-speech-rate" min="-3" max="3" step="0.02" value="0" />
+                                <div class="slider-legend">
+                                    <span>Slower</span>
+                                    <span>Normal</span>
+                                    <span>Faster</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Voice Instructions (visible only when GPT-4o-mini-TTS is selected) -->
+                        <div class="form-group voice-instructions-container" id="guest-voice-instructions-container" style="display: none;">
+                            <label for="guest-voice-instructions-preset">Voice Instructions:</label>
+                            <select id="guest-voice-instructions-preset">
+                                <option value="">Select instructions...</option>
+                                <option value="professional">Professional Podcast Guest</option>
+                                <option value="enthusiastic">Enthusiastic and Energetic</option>
+                                <option value="calm">Calm and Soothing</option>
+                                <option value="authoritative">Authoritative Expert</option>
+                                <option value="conversational">Casual Conversational</option>
+                                <option value="dramatic">Dramatic Speaker</option>
+                                <option value="friendly">Friendly and Approachable</option>
+                                <option value="contemplative">Thoughtful and Contemplative</option>
+                                <option value="academic">Academic Professor</option>
+                                <option value="storytelling">Engaging Storyteller</option>
+                                <option value="technical">Technical Specialist</option>
+                                <option value="custom">〈custom〉</option>
+                            </select>
+                            <textarea id="guest-voice-instructions" rows="3" placeholder="Custom voice instructions will appear here. You can edit them directly."></textarea>
+                        </div>
+                        
+                        <!-- Character Preview (shown when character has data) -->
+                        <div class="character-preview" id="guest-preview" style="display: none;">
+                            <h3>Guest Character Preview</h3>
+                            <div class="character-traits" id="guest-traits">
+                                <!-- Will be populated by JS -->
+                            </div>
+                            <div class="character-status complete" id="guest-status">
+                                <span id="guest-status-icon">✓</span> 
+                                <span id="guest-status-text">Character complete</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Backstory Generation -->
+                        <div class="form-group">
+                            <label for="guest-backstory-prompt">Generate Backstory:</label>
+                            <div class="backstory-prompt-container">
+                                <input type="text" id="guest-backstory-prompt" placeholder="Brief description for backstory generation..." />
+                                <button id="generate-guest-backstory" class="btn-secondary">Generate</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Backstory Text -->
+                        <div class="form-group">
+                            <label for="guest-backstory">Character Backstory:</label>
+                            <textarea id="guest-backstory" rows="6" placeholder="Enter or generate character backstory..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="save-guest" class="btn-primary">Save Guest Character</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 5: Podcast Outline Generator -->
+            <section id="outline-section" class="workflow-section disabled">
+                <h2>
+                    <span class="step-number">5</span>
+                    Podcast Outline
+                </h2>
+                <div class="section-content">
+                    <div class="content-generator">
+                        <!-- Podcast configuration options -->
+                        <div class="form-group full-width">
+                            <label for="podcast-duration">Target Duration (minutes)</label>
+                            <input type="number" id="podcast-duration" value="30" min="5" max="180" step="5" />
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="outline-text">Podcast Outline:</label>
+                            <div class="progress-container" id="outline-progress" style="display: none;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill"></div>
+                                </div>
+                                <button class="btn-cancel" id="cancel-outline">Cancel</button>
+                            </div>
+                            <textarea id="outline-text" class="content-textarea monospace" rows="10" placeholder="Podcast outline will appear here..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="generate-outline" class="btn-primary">Generate Outline</button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Section 6: Podcast Script Generator -->
+            <section id="script-section" class="workflow-section disabled">
+                <h2>
+                    <span class="step-number">6</span>
+                    Podcast Script
+                </h2>
+                <div class="section-content">
+                    <div class="content-generator">
+                        <div class="form-group full-width">
+                            <label for="script-language">Script Language:</label>
+                            <select id="script-language" class="form-control">
+                                <!-- Options will be populated dynamically based on selected TTS model -->
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="script-text">Podcast Script:</label>
+                            <div class="progress-container" id="script-progress" style="display: none;">
+                                <div class="progress-bar">
+                                    <div class="progress-fill"></div>
+                                </div>
+                                <button class="btn-cancel" id="cancel-script">Cancel</button>
+                            </div>
+                            <textarea id="script-text" class="content-textarea" rows="15" placeholder="Full podcast script will appear here..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="generate-script" class="btn-primary">Generate Script</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 7: Podcast Audio Generator -->
+            <section id="audio-section" class="workflow-section disabled">
+                <h2>
+                    <span class="step-number">7</span>
+                    Podcast Audio
+                </h2>
+                <div class="section-content">
+                    <div class="audio-generator">
+                        <div class="form-group">
+                            <label for="silence-duration">Silence Between Speakers (milliseconds):</label>
+                            <input type="number" id="silence-duration" value="500" min="0" max="2000" step="100" />
+                        </div>
+                        <div class="progress-container" id="audio-progress" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <button class="btn-cancel">Cancel</button>
+                        </div>
+                        <div class="audio-result" id="audio-result" style="display: none;">
+                            <audio controls>
+                                <source id="audio-source" src="" type="audio/mpeg">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <button id="download-audio" class="btn-primary" disabled>Download Podcast</button>
+                        <div class="spacer"></div>
+                        <button id="generate-audio" class="btn-primary" disabled>Generate Audio</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Built with ❤️ using Windsurf and OpenAI API</p>
+        </footer>
+    </div>
+
+    <script src="js/lib/lame.min.js"></script>
+    <script type="module" src="js/index.js"></script>
+</body>
+</html>
