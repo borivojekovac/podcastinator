@@ -3,6 +3,7 @@ class NotificationsManager {
     constructor() {
         this.notificationTimeouts = new Map();
         this.notificationDuration = 5000; // 5 seconds
+        this._idCounter = 0;
     }
 
     /**
@@ -58,11 +59,16 @@ class NotificationsManager {
      */
     _showNotification(type, message, id = null) {
         // Generate an ID if not provided
-        const notificationId = id || Date.now();
+        const notificationId = id != null
+            ? id
+            : (typeof window !== 'undefined' && window.crypto && typeof window.crypto.randomUUID === 'function'
+                ? window.crypto.randomUUID()
+                : `${Date.now()}-${++this._idCounter}`);
         
         // Clear any existing timeout for this notification ID
         if (this.notificationTimeouts.has(notificationId)) {
             clearTimeout(this.notificationTimeouts.get(notificationId));
+            this.notificationTimeouts.delete(notificationId);
         }
 
         // Create notification with ID
@@ -96,10 +102,20 @@ class NotificationsManager {
             notification.classList.add('hide');
             
             // Remove from DOM after animation completes
-            notification.addEventListener('transitionend', function handler() {
+            const handler = function handler() {
                 notification.removeEventListener('transitionend', handler);
                 notification.remove();
-            });
+            };
+            notification.addEventListener('transitionend', handler);
+            
+            // Fallback in case no transition event fires (e.g., missing CSS transition)
+            setTimeout(function() {
+                const el = document.getElementById(`notification-${id}`);
+                if (el) {
+                    el.removeEventListener('transitionend', handler);
+                    el.remove();
+                }
+            }, 350);
         }
         
         // Clear the timeout
