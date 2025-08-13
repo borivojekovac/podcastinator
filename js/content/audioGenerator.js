@@ -3,6 +3,7 @@ import NotificationsManager from '../ui/notifications.js';
 import ProgressManager from '../ui/progressManager.js';
 import Mp3Encoder from '../utils/mp3Encoder.js';
 import RetryManager from '../utils/retryManager.js';
+import AudioBlobStore from '../utils/idbAudio.js';
 
 /**
  * Handles the generation of podcast audio using OpenAI TTS
@@ -44,28 +45,29 @@ class AudioGenerator {
         
         // Blob URL for current audio
         this.audioUrl = null;
+
+        // IndexedDB audio store
+        this.audioStore = new AudioBlobStore();
+        this.audioId = 'latest';
         
-        // Load existing audio data from storage
+        // Load saved preferences (only small metadata here)
         const savedData = this.storageManager.load('audioData', {});
-        this.audioData = savedData.audioData || null; // Base64 encoded audio data
         this.silenceDuration = savedData.silenceDuration || 500; // Default 500ms silence between speakers
-        
-        // If we have audio data, create a blob URL for it
-        if (this.audioData) {
-            this.createBlobUrlFromAudioData();
-        }
     }
 
     /**
      * Initialize the audio generator
      */
-    init() {
+    async init() {
         // Initialize UI components
         this.initializeUI();
         
         // Set up event listeners
         this.setupEventListeners();
-        
+
+        // Load saved audio blob from IndexedDB
+        await this.loadSavedAudio();
+
         // Restore saved data if it exists
         this.restoreSavedData();
         
@@ -81,6 +83,24 @@ class AudioGenerator {
                 self.contentStateManager.updateState('hasScript', true);
             }
         }, 100);
+    }
+
+    /**
+     * Load previously saved audio Blob from IndexedDB and prepare URL
+     */
+    async loadSavedAudio() {
+        try {
+            const record = await this.audioStore.load(this.audioId);
+            if (record && record.blob) {
+                if (this.audioUrl) {
+                    URL.revokeObjectURL(this.audioUrl);
+                }
+                this.audioUrl = URL.createObjectURL(record.blob);
+                this.contentStateManager.updateState('hasAudio', true);
+            }
+        } catch (e) {
+            console.error('Failed to load saved audio from IndexedDB:', e);
+        }
     }
     
     /**
@@ -418,24 +438,21 @@ class AudioGenerator {
             
             // Finalize MP3 encoding
             const mp3Blob = this.mp3Encoder.finish();
-            
-            // Convert blob to base64 data for storage
-            const reader = new FileReader();
-            const self = this;
-            
-            reader.onloadend = function handleReaderComplete() {
-                // Store the base64 data
-                self.audioData = reader.result;
-                self.saveAudioData();
-                
-                // Create a blob URL for playback
-                self.createBlobUrlFromAudioData();
-                
-                // Show audio player
-                self.showAudioPlayer(self.audioUrl);
-            };
-            
-            reader.readAsDataURL(mp3Blob);
+
+            // Save Blob to IndexedDB and update UI
+            await this.audioStore.save(this.audioId, mp3Blob, { type: 'audio/mpeg' });
+
+            // Release previous URL if exists and create a new one
+            if (this.audioUrl) {
+                URL.revokeObjectURL(this.audioUrl);
+            }
+            this.audioUrl = URL.createObjectURL(mp3Blob);
+
+            // Persist preferences (silenceDuration) to localStorage
+            this.saveAudioData();
+
+            // Show audio player
+            this.showAudioPlayer(this.audioUrl);
             
             // Update state
             this.contentStateManager.updateState('hasAudio', true);
@@ -603,53 +620,18 @@ class AudioGenerator {
     }
     
     /**
-     * Save audio data to storage
+     * Save audio preferences to storage (not the audio itself)
      */
     saveAudioData() {
-        const audioData = {
-            audioData: this.audioData, // Base64 encoded audio data
+        const audioPrefs = {
             silenceDuration: this.silenceDuration
         };
-        
-        // Save to localStorage - since we're now using MP3 format,
-        // the size is much smaller and more suitable for localStorage
-        this.storageManager.save('audioData', audioData);
+
+        // Save only small metadata to localStorage
+        this.storageManager.save('audioData', audioPrefs);
     }
     
-    /**
-     * Create a blob URL from the stored base64 audio data
-     */
-    createBlobUrlFromAudioData() {
-        if (!this.audioData) {
-            return;
-        }
-        
-        try {
-            // Release previous blob URL if it exists
-            if (this.audioUrl) {
-                URL.revokeObjectURL(this.audioUrl);
-            }
-            
-            // Convert base64 to blob
-            const base64Data = this.audioData.split(',')[1];
-            const binaryString = window.atob(base64Data);
-            const bytes = new Uint8Array(binaryString.length);
-            
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            
-            const blob = new Blob([bytes.buffer], { type: 'audio/mp3' });
-            this.audioUrl = URL.createObjectURL(blob);
-        } catch (error) {
-            console.error('Error creating blob URL from audio data:', error);
-            this.notifications.showError('Error loading saved audio');
-            
-            // Clear invalid data
-            this.audioData = null;
-            this.audioUrl = null;
-        }
-    }
+    // Base64-to-Blob path removed; audio is now stored in IndexedDB as Blob
     
     /**
      * Handle API error response
