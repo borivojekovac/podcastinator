@@ -126,6 +126,7 @@ This begins the podcast conversation:
 - Begin with the host welcoming the audience to the podcast
 - Introduce the podcast topic
 - Introduce the guest with relevant credentials
+- Guest thanks the host for introducing them
 - Brief exchange to establish rapport
 - Explain what listeners will learn`;
 
