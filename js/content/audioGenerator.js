@@ -318,49 +318,46 @@ class AudioGenerator {
             
             // Check for section separator
             if (separatorPattern.test(line)) {
-                // Found separator, check next line for speaker
-                if (i + 1 < lines.length) {
-                    const nextLine = lines[i + 1];
-                    const speakerMatch = nextLine.match(speakerPattern);
-                    
-                    // Save current segment if exists
-                    if (currentSpeaker && currentText.trim()) {
-                        segments.push({
-                            speaker: currentSpeaker,
-                            text: currentText.trim()
-                        });
-                        currentText = '';
-                    }
-                    
-                    // Update speaker if the next line is a speaker marker
-                    if (speakerMatch) {
-                        currentSpeaker = speakerMatch[1].toUpperCase();
-                        i++; // Skip the speaker line
-                    }
+                // Save current segment if exists before moving to next section
+                if (currentSpeaker && currentText.trim()) {
+                    segments.push({
+                        speaker: currentSpeaker,
+                        text: currentText.trim()
+                    });
+                    currentText = '';
+                    currentSpeaker = null;
+                }
+                
+                // Skip the separator and continue
+                continue;
+            }
+            
+            // Check for speaker labels (either at start of line or full line)
+            const speakerMatch = line.match(speakerPattern);
+            
+            if (speakerMatch) {
+                // If current segment is in progress, save it
+                if (currentSpeaker && currentText.trim()) {
+                    segments.push({
+                        speaker: currentSpeaker,
+                        text: currentText.trim()
+                    });
+                    currentText = '';
+                }
+                
+                // Update speaker and capture text content if there is any on this line
+                currentSpeaker = speakerMatch[1].toUpperCase();
+                
+                // If there's text after the speaker label on the same line, include it
+                if (speakerMatch[2] && speakerMatch[2].trim()) {
+                    currentText = speakerMatch[2].trim() + '\n';
+                } else {
+                    currentText = '';
                 }
             }
-            // Check for inline speaker labels
-            else {
-                const speakerMatch = line.match(speakerPattern);
-                
-                if (speakerMatch) {
-                    // If current segment is in progress, save it
-                    if (currentSpeaker && currentText.trim()) {
-                        segments.push({
-                            speaker: currentSpeaker,
-                            text: currentText.trim()
-                        });
-                        currentText = '';
-                    }
-                    
-                    // Update speaker and capture text content
-                    currentSpeaker = speakerMatch[1].toUpperCase();
-                    currentText = speakerMatch[2] + '\n';
-                }
-                else if (currentSpeaker) {
-                    // Add to current segment
-                    currentText += line + '\n';
-                }
+            else if (currentSpeaker) {
+                // Add to current segment
+                currentText += line + '\n';
             }
         }
         
@@ -371,6 +368,12 @@ class AudioGenerator {
                 text: currentText.trim()
             });
         }
+        
+        // Debug: Log the parsed segments
+        console.log(`Parsed ${segments.length} script segments:`);
+        segments.forEach(function logSegment(segment, index) {
+            console.log(`Segment ${index + 1}: ${segment.speaker} (${segment.text.length} chars)`);
+        });
         
         return segments;
     }

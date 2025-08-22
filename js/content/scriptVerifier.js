@@ -3,8 +3,6 @@ import NotificationsManager from '../ui/notifications.js';
 import {
     buildScriptSectionVerificationSystem,
     buildScriptSectionVerificationUser,
-    buildScriptVerificationSystem,
-    buildScriptVerificationUser,
     buildScriptCrossSectionVerificationSystem,
     buildScriptCrossSectionVerificationUser
 } from './prompts/scriptPrompts.js';
@@ -100,7 +98,7 @@ class ScriptVerifier {
                 data = await this.apiManager.createChatCompletion(requestBody, apiData.apiKey);
             } catch (error) {
                 console.error('Section verification failed:', error);
-                return { isValid: true, feedback: 'Verification skipped due to API error. Using original section.' };
+                return { isValid: true, feedback: 'Verification skipped due to API error. Using original section.', issues: [] };
             }
             
             const verificationText = data.choices[0]?.message?.content?.trim();
@@ -121,9 +119,12 @@ class ScriptVerifier {
                 const jsonMatch = verificationText.match(/{[\s\S]*}/m);
                 if (jsonMatch) {
                     const resultJson = JSON.parse(jsonMatch[0]);
+                    
+                    // Return with structured issues if available
                     return {
                         isValid: !!resultJson.isValid, // Ensure boolean
-                        feedback: resultJson.feedback || 'No specific feedback provided.'
+                        feedback: resultJson.feedback || 'No specific feedback provided.',
+                        issues: Array.isArray(resultJson.issues) ? resultJson.issues : []
                     };
                 } else {
                     // Fallback if no JSON found
@@ -132,19 +133,20 @@ class ScriptVerifier {
                                       verificationText.toLowerCase().includes('good');
                     return {
                         isValid: isPositive,
-                        feedback: verificationText.substring(0, 200) + '...'
+                        feedback: verificationText.substring(0, 200) + '...',
+                        issues: []
                     };
                 }
             } catch (error) {
                 console.error('Error parsing verification result:', error);
                 // Default to assuming it's valid to avoid blocking workflow
-                return { isValid: true, feedback: 'Unable to parse verification result. Using original section.' };
+                return { isValid: true, feedback: 'Unable to parse verification result. Using original section.', issues: [] };
             }
             
         } catch (error) {
             console.error('Error during section verification:', error);
             // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original section.' };
+            return { isValid: true, feedback: 'Verification error. Using original section.', issues: [] };
         }
     }
     

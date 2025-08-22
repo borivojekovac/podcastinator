@@ -41,7 +41,16 @@ class ScriptImprover {
     processScriptText(scriptText) {
     
         // Remove markdown code blocks if present
-        let processedText = scriptText.replace(/```markdown|```md|```/g, '').trim();
+        let processedText = scriptText
+            .replace(/\r\n/g, '\n')
+            .replace(/\r/g, '\n')
+            // Remove opening code fences like ```markdown, ``` md, ```
+            .replace(/```\s*[a-zA-Z-]*\s*\n?/g, '')
+            // Remove any remaining triple backticks
+            .replace(/```/g, '')
+            // Remove stray lines that only say 'markdown' or 'md'
+            .replace(/^(?:markdown|md)\s*$/gim, '')
+            .trim();
         
         // Remove any stage directions [like this] that might have been added
         processedText = processedText.replace(/\[[^\]]+\]/g, '');

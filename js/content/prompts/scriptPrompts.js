@@ -2,20 +2,32 @@
 
 // Verification: Section
 export function buildScriptSectionVerificationSystem() {
-    return `You are a podcast script section quality checker and fact verifier. Your job is to analyze a generated podcast script section against its outline section and original document content for:
+    return `You are a podcast script section quality checker. Analyze a specific section of a podcast script for quality, coherence, and adherence to requirements.
 
-1. FACTUAL ACCURACY: Ensure all claims and information are supported by the original document
-2. SECTION ADHERENCE: Ensure the script follows the specific section topic from the outline
-3. COVERAGE: Check if the section adequately covers the topic without omitting key information
-4. REDUNDANCY CHECK (HIGH PRIORITY): Identify any redundant content or repetitive dialogue, particularly checking if this section repeats information already covered in previous sections
-5. CONVERSATIONAL FLOW: Verify that the dialogue feels natural and flows well between speakers
-6. CHARACTER CONSISTENCY: Ensure host and guest voices maintain consistent personalities
+Evaluate the following criteria:
+1. DURATION COMPLIANCE (HIGHEST PRIORITY): Verify the script meets the target word count (160 words per minute) for the section's duration. If the word count is below target, the script MUST be marked invalid.
+2. COMPLETENESS: Verify that the script covers all key points from the outline
+3. RELEVANCE: Check if the script stays focused on the topic without tangential discussions
+4. ACCURACY: Ensure the script is factually consistent with the document content
+5. CONSISTENCY: Check for internal consistency and lack of contradictions
+6. ENGAGING DIALOGUE: Ensure the script sounds like a natural conversation from the outline
+7. COVERAGE: Check if the section adequately covers the topic without omitting key information
+8. REDUNDANCY CHECK (HIGH PRIORITY): Identify any redundant content or repetitive dialogue, especially if this section repeats information from previous sections
+9. CONVERSATIONAL FLOW: Verify that the dialogue feels natural and flows well between speakers
+10. CHARACTER CONSISTENCY: Ensure host and guest voices maintain consistent personalities
 
-Respond with a JSON object containing:
-- "isValid": true if the section meets quality criteria, false otherwise
-- "feedback": specific issues found (if isValid is false) or confirmation (if isValid is true)
+Respond with a detailed JSON object containing:
+- "isValid": true if the section meets all quality criteria, false otherwise
+- "feedback": high-level summary of findings
+- "issues": array of specific issues, each containing:
+  * "type": issue type ("accuracy", "outline", "duration", "speaker_turn", "continuity", "conversation", "format")
+  * "description": detailed description of the issue
+  * "location": exact quote from the script showing the problematic text
+  * "recommendation": specific suggestion on how to fix the issue
 
-If the section is high quality and follows the outline well, respond with {"isValid": true, "feedback": "Section is well-structured and follows the outline appropriately."}`;
+For each issue found, you MUST include exact quotes from the script to precisely identify where the problem occurs. Be very specific in your recommendations for fixes.
+
+If the section is high quality and follows the outline well, respond with {"isValid": true, "feedback": "Section is well-structured and follows the outline appropriately.", "issues": []}`;
 }
 
 // System prompt for script generation based on part type
@@ -69,9 +81,11 @@ ${documentContent}
 - Create natural-sounding conversational dialogue suitable for text-to-speech
 - Text should contain only what would be actually spoken aloud
 - NEVER refer to "segments", "sections", or "parts" of the podcast - the conversation should flow naturally as a single discussion
-- Pay close attention to the target duration for this section and aim to generate dialogue that would take approximately that amount of time to speak aloud
-- Adjust the level of detail and depth based on the allocated duration for this section, assuming 160 words per minute are spoken
-- DO NOT wrap the output in code / markdown fences ("\`\`\`").
+        - CRITICAL DURATION REQUIREMENT: Generate exactly enough dialogue to meet the target duration. At 160 words per minute, a section must meet its word count target.
+        - LENGTH PENALTY: Scripts consistently run short. Add substantive detail and depth until you reach or slightly exceed the target word count.
+        - VERBOSITY REQUIRED: Prefer longer turns with detailed explanations over brief exchanges. Include examples, analogies, and elaboration to reach word targets.
+        - MEASURE YOUR OUTPUT: Count your generated words and ensure they match the section's target before finalizing.
+- DO NOT wrap the output in code / markdown fences ("\`\`\`") nor identify the markdown format.
 
 ## Conversation Guidelines
 
@@ -94,8 +108,7 @@ ${getPersonalityDescription(guest.personality)}
         basePrompt += `
         
 ## Example Mid-Conversation Output Format
-        
-\`\`\` markdown
+
 ---
 HOST:
 I find that perspective on the data really insightful. It makes me wonder about the implications for future development in this area.
@@ -111,7 +124,7 @@ Could you elaborate on which of those factors you think will have the biggest im
 ---
 GUEST:
 I'd say the most significant one is probably the shift in how we're approaching the fundamental challenge of...
-\`\`\``;
+`;
     }
 
     if (partType === 'intro') {
@@ -168,7 +181,7 @@ function getPersonalityDescription(personalityType) {
 }
 
 // Generation: Section
-export function buildScriptSectionUser(section, totalPodcastDuration, lastDialogueExchanges, topicsSummary, partType) {
+export function buildScriptSectionUser(section, totalPodcastDuration, lastDialogueExchanges, topicsSummary, partType, aggregatedSummaries, aggregatedTopics) {
     let userPrompt = `# TASK: Generate Podcast Script Section
 
 ## FOCUS FOR THIS SECTION
@@ -201,8 +214,17 @@ ${extractCarryover(section.content)}
     if (totalPodcastDuration) {
         userPrompt += `
 
-## Section Duration Guidance
-This section should be approximately ${section.durationMinutes} minutes long (${section.durationMinutes * 160} words) out of the total ${totalPodcastDuration} minute (${totalPodcastDuration * 160} words) podcast. Adjust the depth and detail accordingly.
+## SECTION DURATION REQUIREMENT - CRITICAL
+This section MUST be ${section.durationMinutes} minutes long, requiring EXACTLY ${section.durationMinutes * 160} words minimum out of the total ${totalPodcastDuration} minute podcast.
+
+### Word Count Achievement Strategy
+- COUNT your output words before submitting
+- FAIL: If your word count is under target, ADD more substantive detail, examples, and expert insights
+- EXPAND dialogue turns for both speakers with more detail and depth
+- Include concrete examples, analogies, and elaboration in responses
+- Make guest responses especially thorough and detailed when explaining concepts
+- Focus on depth over brevity - longer, substantive turns are required
+- Host should ask follow-up questions that encourage detailed responses
 `;
     }
 
@@ -301,12 +323,11 @@ export function buildConversationSummarySystem() {
 export function buildConversationSummaryUser(lastSectionContent) {
     return `Analyze the following podcast conversation section and create a structured summary:
 
-1. GENERAL SUMMARY: Brief overview of the conversation (max 100 words)
+1. GENERAL SUMMARY: Brief overview of the conversation (max 200 words)
 
 2. KEY TOPICS COVERED: 
    - List the specific topics, concepts, terminology, and facts discussed
    - Use precise language that matches how they were discussed
-   - Include 5-8 key topics/facts maximum
 
 3. TOPIC CONTEXT: 
    - For each topic, note HOW it was discussed (e.g., introduced, explained in depth, briefly mentioned)
@@ -376,78 +397,57 @@ CONTINUITY ASSERTIONS (CRITICAL):
 - Flag any claims like "as we discussed", "as mentioned earlier", "now that we've established" UNLESS the referenced topic appears in the PREVIOUS SECTION text or is evident in the earlier parts of the script.
 - Provide exact quotes and suggested fixes for any unsupported continuity claims.
 
-Respond in JSON with at least: { isValid, feedback, speakerTurnIssues: [], continuityIssues: [] }.`;
+Respond in a structured JSON format with the following fields:
+- "isValid": true if the section meets all quality criteria, false otherwise
+- "feedback": high-level summary of findings
+- "issues": array of specific issues, each containing:
+  * "type": issue type ("accuracy", "outline", "duration", "speaker_turn", "continuity", "conversation", "format")
+  * "description": detailed description of the issue
+  * "location": exact quote from the script showing the problematic text
+  * "recommendation": specific suggestion on how to fix the issue
+
+For each issue found, you MUST include exact quotes from the script to precisely identify where the problem occurs. Be very specific in your recommendations for fixes.`;
 }
 
 // Verification: Full script
-export function buildScriptVerificationSystem() {
-    return `You are a podcast script quality checker and fact verifier. Your job is to analyze a generated podcast script against the outline and original document content for:
-
-1. FACTUAL ACCURACY: Ensure all claims and information in the script are supported by the original document
-2. OUTLINE ADHERENCE: Ensure the script follows the structure and topics in the outline
-3. DURATION ACCURACY: Check if the script's length is appropriate for the target podcast duration
-4. REDUNDANCY CHECK (HIGH PRIORITY): Identify any redundant content or repetitive dialogue, particularly:
-   - Host saying "I've heard that..." about topics already discussed
-   - Topics covered in multiple sections without acknowledgment
-   - Same facts or examples repeated in different parts of the script
-   - Topics introduced as new when they've been discussed before
-5. CONVERSATIONAL FLOW: Verify that the dialogue feels natural and flows well between speakers
-6. CHARACTER CONSISTENCY: Ensure host and guest voices maintain consistent personalities
-
-For redundancy issues, provide specific examples of the redundant content and how it should be fixed.
-
-Respond with a JSON object containing:
-- "isValid": true if the script meets quality criteria, false otherwise
-- "feedback": specific issues found (if isValid is false) or confirmation (if isValid is true)
-- "redundancyIssues": array of specific redundancy problems (empty if none found)
-
-If the script is high quality and follows the outline well, respond with {"isValid": true, "feedback": "Script is well-structured and follows the outline appropriately.", "redundancyIssues": []}`;
-}
-
-export function buildScriptVerificationUser(scriptText, outlineText, documentContent, totalPodcastDuration) {
-    return `Please review this podcast script for quality and coherence against the outline and original document.
-
-Target Podcast Duration: ${totalPodcastDuration} minutes (${totalPodcastDuration * 160} words)
-
---- OUTLINE STRUCTURE ---
-\`\`\` markdown
-${outlineText}
-\`\`\`
-
---- GENERATED SCRIPT ---
-\`\`\` markdown
-${scriptText}
-\`\`\`
-
---- ORIGINAL DOCUMENT CONTENT ---
-\`\`\` markdown
-${documentContent}
-\`\`\`
-
-Verify if this script is factually accurate (comparing to the document), follows the outline structure, maintains appropriate pacing for the target duration, avoids redundancy, and maintains good conversational flow. Respond in the required JSON format.`;
-}
-
 // Verification: Cross-section
 export function buildScriptCrossSectionVerificationSystem() {
-    return `You are a podcast script cross-section quality checker. Your ONLY job is to analyze the script for issues that span across different sections of the podcast:
+    return `You are a podcast script cross-section quality checker. Analyze ONLY issues that span multiple sections of the podcast.
 
-1. GLOBAL REDUNDANCY: Identify content repeated across different sections
-2. NARRATIVE COHERENCE: Verify the podcast flows logically from beginning to end
-3. TOPIC TRANSITIONS: Check that transitions between sections are smooth and natural
-4. DISTRIBUTION BALANCE: Ensure key topics aren't concentrated too heavily in some sections
-5. OVERALL PACING: Verify the podcast maintains appropriate pacing across sections
+Context (CRITICAL):
+- Sections were generated and validated individually from an outline with minimal context of prior/later sections.
+- There are no explicit section separators inside the conversation; the full script is a concatenation of these isolated sections.
+- Dialogue is organized in segments separated by '---' lines; each segment is labeled HOST: or GUEST:.
+- Never suggest or apply swapping HOST and GUEST labels. Keep each speaker in-character; their knowledge and style differ.
 
-IMPORTANT: DO NOT focus on section-specific issues like factual accuracy or character consistency, as these have already been addressed. ONLY look for issues that span across multiple sections.
+Evaluate ONLY cross-section concerns:
+1. GLOBAL REDUNDANCY: Identify repeated information across different sections. Flag specific types:
+   - Host saying "I've heard that..." about topics not previously discussed
+   - Topics covered in multiple sections without acknowledgment
+   - Same facts or examples repeated in different parts
+   - Topics introduced as new when they've been discussed before
+   Prefer rephrasing to remove duplication while preserving any additional details.
+2. NARRATIVE COHERENCE: Check that the conversation reads as one continuous discussion from start to end.
+3. TOPIC TRANSITIONS: Ensure transitions between sections feel smooth and natural (avoid abrupt resets).
+4. CONTINUITY CLAIMS: Flag claims like "as discussed earlier" that aren't supported by earlier content.
+5. SPEAKER HANDOFFS: At section boundaries, avoid same-speaker handoffs and any triple same-speaker runs.
+
+Do NOT assess: distribution balance, overall pacing, detailed per-section accuracy, or character consistency (handled elsewhere).
 
 Respond with a JSON object containing:
 - "isValid": true if there are no cross-section issues, false otherwise
-- "feedback": specific cross-section issues found (if isValid is false) or confirmation (if isValid is true)`;
+- "feedback": high-level summary of issues found (if isValid is false) or confirmation (if isValid is true)
+- "issues": array of specific issues, each containing:
+  * "type": issue type ("redundancy", "transition", "continuity", "speaker_handoff")
+  * "description": detailed description of the issue
+  * "location": exactly where the issue occurs (include exact quotes from both problematic sections)
+  * "recommendation": specific suggestion on how to fix the issue
+
+For each issue found, you MUST include exact quotes from the script to precisely identify where the problem occurs. Be very specific in your recommendations for fixes.`;
 }
 
 export function buildScriptCrossSectionVerificationUser(scriptText, outlineText, totalPodcastDuration) {
-    return `Please review this podcast script ONLY for cross-section issues - problems that occur across multiple sections of the podcast.
-
-Target Podcast Duration: ${totalPodcastDuration} minutes (${totalPodcastDuration * 160} words)
+    return `Review ONLY for cross-section issues.
 
 --- OUTLINE STRUCTURE ---
 \`\`\` markdown
@@ -459,40 +459,54 @@ ${outlineText}
 ${scriptText}
 \`\`\`
 
-Focus EXCLUSIVELY on these cross-section issues:
-1. Redundancy across sections (same topics or facts repeated in different sections)
-2. Narrative flow between sections (awkward transitions)
-3. Content distribution (important topics being unevenly distributed)
-4. Overall structure and pacing
-5. Script length (should be close to target duration)
-6. Speaker alternation at section boundaries (avoid same-speaker handoffs; no triples)
-7. Unsupported continuity claims across sections (claims of prior discussion without evidence in earlier sections)
+Focus on:
+1. Redundancy across sections (remove repetition via rephrasing while preserving any added details)
+2. Narrative flow and transitions between sections
+3. Unsupported continuity claims across sections
+4. Speaker alternation at section boundaries (avoid same-speaker handoffs; no triples)
 
-DO NOT evaluate individual section quality, factual accuracy, or other issues already addressed in per-section verification.
+IMPORTANT REQUIREMENTS:
+- For each issue, include exact quotes from the problematic sections to precisely identify locations
+- Provide specific recommendations on how to fix each issue
+- Use the structured JSON format defined in the system prompt
+- For redundancy issues, identify both instances (original and repetition) with exact quotes
+- For transition issues, quote both the end of one section and beginning of the next
+- For speaker handoff issues, quote the problematic dialogue sequence
 
-Respond in the required JSON format.`;
+Do NOT assess pacing/distribution, section-level facts, or character consistency.
+
+Respond in the required JSON format with detailed "issues" array.`;
 }
 
 // Improvement: Section
 export function buildScriptSectionImproveSystem() {
-    return `You are a podcast script editor. Your task is to improve a specific section of a podcast script based on verification feedback.
+    return `You are a podcast script editor specializing in making targeted improvements to script sections based on structured verification feedback.
 
 IMPORTANT INSTRUCTIONS:
 
-1. MAKE TARGETED CHANGES ONLY - Only modify the parts mentioned in the feedback. Do not rewrite unaffected parts.
-2. MAINTAIN CONVERSATIONAL STYLE - Keep the natural dialogue flow between HOST and GUEST.
-3. PRESERVE FORMAT - Maintain speaker identifiers (HOST: and GUEST:) and overall structure.
-4. FIX IDENTIFIED ISSUES - Address all points in the feedback thoroughly.
-5. PRESERVE SECTION LENGTH - Your improved section should be approximately the same length as the original, unless specified otherwise in the feedback.
-6. FIX SPEAKER TURN-TAKING - Ensure alternating speakers; avoiding starting with the same speaker who finished the previous section, unless it is a very brief single follow-up.
-7. REMOVE UNSUPPORTED CONTINUITY - Remove or reframe any claims of prior coverage that aren't supported by the provided previous section/topics.
+1. USE EXACT QUOTES - Use the exact quotes provided in the structured feedback to precisely locate where changes need to be made.
+2. FOLLOW RECOMMENDATIONS - Implement the specific recommendations for fixes provided in the feedback.
+3. MAKE TARGETED CHANGES ONLY - Only modify the parts mentioned in the feedback issues. Preserve unaffected dialogue verbatim.
+4. MAINTAIN CONVERSATIONAL STYLE - Keep the natural dialogue flow between HOST and GUEST.
+5. PRESERVE FORMAT - Maintain speaker identifiers (HOST: and GUEST:) and overall structure with '---' separators.
+6. ADDRESS ALL ISSUES - Fix every issue mentioned in the feedback array thoroughly.
+7. MEET OR EXCEED TARGET DURATION - Each section must have at least the target word count (160 words per minute). If the original was below target duration, EXPAND it by adding substantive detail and depth.
+8. MAINTAIN CONVERSATION FLOW - Keep logical dialogue where the HOST asks questions and the GUEST provides expert answers. Don't swap HOST/GUEST labels just to create alternation.
+9. HANDLE SPECIFIC ISSUE TYPES APPROPRIATELY:
+   - ACCURACY issues: Correct factual errors to match document content
+   - OUTLINE issues: Add missing content from the outline
+   - DURATION issues: Expand content to reach target word count
+   - SPEAKER_TURN issues: Fix improper turn-taking or triple-speaker sequences
+   - CONTINUITY issues: Remove/reframe unsupported claims of prior coverage
+   - CONVERSATION issues: Improve dialogue naturalness and flow
+   - FORMAT issues: Fix any structural or formatting problems
 
 Return the complete improved section that can be used as a direct replacement for the original section.`;
 }
 
 export function buildScriptSectionImproveUser(originalSectionText, feedback, section, documentContent, totalPodcastDuration, characterContext) {
     const feedbackStr = typeof feedback === 'string' ? feedback : JSON.stringify(feedback, null, 2);
-    const base = `I have a podcast script section that needs targeted improvements based on verification feedback.
+    const base = `I have a podcast script section that needs targeted improvements based on structured verification feedback.
 
 Target Duration for this Section: ${section.durationMinutes} minutes
 Total Podcast Duration: ${totalPodcastDuration} minutes
@@ -503,7 +517,7 @@ ${section.content}
 \`\`\`
 
 --- ORIGINAL SECTION ---
- \`\`\` markdown
+\`\`\` markdown
 ${originalSectionText}
 \`\`\`
 
@@ -517,42 +531,59 @@ ${feedbackStr}
 ${documentContent}
 \`\`\`
 
-Please improve this section by addressing the specific issues mentioned in the verification feedback. Return the complete improved section that maintains the same basic structure and approximate length as the original.
+IMPORTANT INSTRUCTIONS:
 
-Additionally, ensure:
-- Speaker turn-taking alternates properly and does not begin with the same speaker as the prior section (if provided).
-- Any continuity phrases implying prior discussion are supported by the provided previous section/topics; otherwise, rephrase as new information.`;
+1. USE THE STRUCTURED FEEDBACK - The feedback contains a JSON object with an "issues" array. Each issue has:
+   - "type": The category of issue to address
+   - "description": Detailed explanation of the problem
+   - "location": EXACT QUOTE from the script where the issue occurs
+   - "recommendation": Specific suggestion for how to fix it
+
+2. MAKE TARGETED FIXES - Use the exact quotes in the "location" field to precisely identify where changes need to be made. Follow the specific recommendations for each issue.
+
+3. ADDRESS ALL ISSUES - Make sure to fix every issue in the feedback array thoroughly.
+
+4. CONTENT REQUIREMENTS:
+   - Meet or exceed the target word count (${Math.round(section.durationMinutes * 160)} words)
+   - Maintain conversational style between HOST and GUEST
+   - Keep proper speaker alternation (avoid same-speaker sequences)
+   - Fix any factual inaccuracies to match the document content
+   - Remove unsupported claims of prior discussion
+   - Preserve natural dialogue flow and improve engagement
+   - Fix any formatting or structural problems
+
+5. OUTPUT FORMAT - Return the complete improved section that can directly replace the original. Preserve the speaker identifiers (HOST: and GUEST:) and overall structure with '---' separators.`;
 
     return characterContext ? `${base}\n\n${characterContext}` : base;
 }
 
 // Improvement: Cross-section
 export function buildScriptCrossSectionImproveSystem() {
-    return `You are a podcast script editor specializing in fixing cross-section issues. Your job is to improve a podcast script by addressing issues that span across multiple sections.
+    return `You are a podcast script editor specializing in fixing cross-section issues. Improve the script by addressing issues that span multiple sections.
 
-IMPORTANT INSTRUCTIONS FOR CROSS-SECTION IMPROVEMENT:
+Context (CRITICAL): sections were generated individually from an outline with minimal cross-section context, then concatenated. There are no explicit section markers in the conversation; instead, dialogue blocks are separated by '---' and labeled HOST: or GUEST:.
 
-1. FOCUS ON CROSS-SECTION ISSUES ONLY - Only fix issues that span multiple sections (redundancy, transitions, etc).
-2. PRESERVE ORIGINAL CONTENT - Keep all dialogue not affected by cross-section issues exactly as it is.
-3. MAINTAIN EQUIVALENT LENGTH - Your response MUST be approximately the same length as the original script, unless specified otherwise in the feedback.
-4. PRESERVE DETAILED DIALOGUE - Keep the same level of conversational detail and depth as the original script, unless specified otherwise in the feedback.
-5. PRESERVE FORMAT - Maintain section headers, speaker identifiers (HOST/GUEST), and overall structure.
+Important instructions:
+1. Focus ONLY on cross-section issues (redundancy, transitions, continuity claims, boundary speaker handoffs).
+2. Preserve unaffected dialogue verbatim.
+3. Redundancy fixes: prefer rephrasing to remove duplication while retaining any additional information.
+4. Do NOT swap or relabel HOST and GUEST segments. Keep each speaker in-character.
+5. Preserve format: keep '---' separators and exact labels HOST:/GUEST:.
+6. Use the exact quotes provided in the structured feedback to locate precisely where changes need to be made.
+7. Follow the specific recommendations for fixes provided in the feedback.
 
-STRICT OUTPUT REQUIREMENTS:
-
+Strict output requirements:
 - OUTPUT ONLY the complete improved podcast script.
-- DO NOT include explanations, analysis, or meta commentary.
-- DO NOT include the original document content or any citations verbatim.
-- DO NOT wrap the output in code / markdown fences ("\`\`\`").
-- Ensure every dialogue block uses the exact labels 'HOST:' and 'GUEST:' with '---' on the line above each block.
+- No explanations, analysis, or meta commentary.
+- Do NOT include document content or citations.
+- Do NOT wrap output in code fences.
+- Ensure proper HOST/GUEST labeling on their separate lines, with '---' before each block.
 
-Primary cross-section issues to address:
-- Redundant content across different sections (same information repeated)
-- Poor transitions between sections
-- Topics introduced as new when they've been covered in earlier sections
-- Unbalanced distribution of key topics across sections
-- Speaker alternation problems at section boundaries (avoid same-speaker handoffs; no triple same-speaker runs)
-- Unsupported continuity claims across sections (remove or reframe if not evidenced by earlier content)`;
+Primary cross-section issues to address based on feedback structure:
+- REDUNDANCY: Rephrase one instance to avoid duplication while preserving unique information
+- TRANSITION: Smooth connections between sections by adding proper segues
+- CONTINUITY: Fix references to previously undiscussed content
+- SPEAKER_HANDOFF: Modify dialogue to avoid same-speaker consecutive turns at section boundaries`;
 }
 
 export function buildScriptCrossSectionImproveUser(originalScriptText, feedback, outlineText, documentContent, totalPodcastDuration, originalScriptLength, characterData) {
@@ -580,13 +611,11 @@ export function buildScriptCrossSectionImproveUser(originalScriptText, feedback,
         if (guestStyle) {
             lines.push(`GUEST Speaking Style: ${guestStyle}`);
         }
-        lines.push('Always use labels HOST: and GUEST: for speakers. Do NOT replace labels with names.');
+        lines.push('Always use labels HOST: and GUEST: on separate lines for speakers. Do NOT replace labels with names.');
         characterContext = lines.join('\n');
     }
 
-    const base = `You are improving a podcast script by fixing cross-section issues identified in verification feedback.
-
-Target Podcast Duration: ${totalPodcastDuration} minutes
+    const base = `Improve the script by fixing cross-section issues identified in the feedback.
 
 --- ORIGINAL SCRIPT ---
 \`\`\` markdown
@@ -603,18 +632,19 @@ ${feedbackStr}
 ${outlineText}
 \`\`\`
 
---- ORIGINAL DOCUMENT CONTENT ---
-\`\`\` markdown
-${documentContent}
-\`\`\`
-
-IMPORTANT INSTRUCTIONS:
-
-1. FOCUS ON CROSS-SECTION ISSUES - Only modify parts that relate to issues spanning multiple sections.
-2. MAINTAIN ORIGINAL LENGTH - Your improved script should be approximately ${originalScriptLength} characters, unless specified otherwise in the feedback.
-3. PRESERVE all dialogue exchanges, conversational depth, and detail level unrelated to cross-section issues, unless specified otherwise in the feedback.
-4. Ensure proper HOST and GUEST speaker formatting is preserved.
-5. Return the COMPLETE script with your improvements incorporated.`;
+Instructions:
+1. Use the structured feedback with exact quotes to locate precisely where to make changes.
+2. Follow the specific recommendations for each issue in the feedback.
+3. Modify only parts related to cross-section issues (redundancy, transitions, continuity, boundary speaker handoffs).
+4. Keep unaffected dialogue as-is. Aim for roughly ${originalScriptLength} characters, some reductions are acceptable if caused by removing redundancy.
+5. Preserve exact HOST/GUEST labels on their separate lines and '---' separators. Do not swap speaker roles.
+6. For each issue type:
+   - REDUNDANCY: Rewrite one instance to avoid duplication while preserving unique information
+   - TRANSITION: Add proper segues between sections to improve flow
+   - CONTINUITY: Fix references to previously undiscussed content
+   - SPEAKER_HANDOFF: Modify dialogue to prevent consecutive same-speaker turns
+7. Return ONLY the complete improved script, with no explanations.
+8. Try to retain original word count.`;
 
     return characterContext ? `${base}\n\n${characterContext}` : base;
 }

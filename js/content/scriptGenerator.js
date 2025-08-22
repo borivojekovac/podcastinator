@@ -52,6 +52,9 @@ class ScriptGenerator {
         this.lastDialogueExchanges = ''; // Store actual dialogue exchanges for continuity
         this.topicsSummary = ''; // Store structured topics summary
         this.generatedSections = [];
+        // Cumulative context across all prior sections
+        this.allSectionSummaries = [];
+        this.allTopicsCovered = [];
         
         // Load existing script data from storage
         const savedData = this.storageManager.load('scriptData', {});
@@ -403,33 +406,47 @@ class ScriptGenerator {
             const outlineData = this.storageManager.load('outlineData', {});
             const documentContent = documentData.document?.content || '';
             
-            // Perform lightweight final review focusing on cross-section issues
-            const finalReviewNotificationId = Date.now();
-            this.notifications.showInfo('Performing final cross-section review...', finalReviewNotificationId);
-            
-            // Call cross-section verification via ScriptVerifier
-            const finalVerificationResult = await this.scriptVerifier.verifyScriptForCrossSectionIssues(
-                this.scriptData,
-                outlineData.outline,
-                documentContent,
-                characterData,
-                apiData,
-                this.totalPodcastDuration
-            );
-            
-            // Clear the verification notification
-            this.notifications.clearNotification(finalReviewNotificationId);
-            
-            // Log verification feedback
-            this.logVerificationFeedback('Final Cross-Section Review', finalVerificationResult);
-            // Mark completion of full-script verification phase
-            this.updateCompositeProgress('script-progress', afterFullVerify);
-            
-            // If issues found, do one final improvement focused on cross-section fixes
+            // Iterative final cross-section review and improvement (up to 3 attempts)
             let finalScript = this.scriptData;
-            if (!finalVerificationResult.isValid) {
+            let csAttempt = 0;
+            const csMaxAttempts = 3;
+            let finalVerificationResult = { isValid: true, feedback: '' };
+            
+            while (csAttempt < csMaxAttempts) {
+                csAttempt++;
+                const finalReviewNotificationId = Date.now();
+                this.notifications.showInfo(`Performing cross-section review (attempt ${csAttempt}/${csMaxAttempts})...`, finalReviewNotificationId);
+                
+                // Call cross-section verification via ScriptVerifier
+                finalVerificationResult = await this.scriptVerifier.verifyScriptForCrossSectionIssues(
+                    finalScript,
+                    outlineData.outline,
+                    documentContent,
+                    characterData,
+                    apiData,
+                    this.totalPodcastDuration
+                );
+                
+                // Clear the verification notification
+                this.notifications.clearNotification(finalReviewNotificationId);
+                
+                // Log verification feedback
+                this.logVerificationFeedback(`Final Cross-Section Review (Attempt ${csAttempt})`, finalVerificationResult);
+                // Mark completion of full-script verification phase
+                this.updateCompositeProgress('script-progress', afterFullVerify);
+                
+                if (finalVerificationResult.isValid) {
+                    this.notifications.showInfo('Final review passed with no cross-section issues found.');
+                    break;
+                }
+                
+                if (csAttempt >= csMaxAttempts) {
+                    this.notifications.showInfo('Max cross-section improvement attempts reached. Proceeding with best version available.');
+                    break;
+                }
+                
                 const improvementNotificationId = Date.now();
-                this.notifications.showInfo('Applying final cross-section improvements...', improvementNotificationId);
+                this.notifications.showInfo(`Applying cross-section improvements (attempt ${csAttempt}/${csMaxAttempts})...`, improvementNotificationId);
                 
                 // Attempt to improve the script with focus on cross-section issues via ScriptImprover
                 const improvedScript = await this.scriptImprover.improveCrossSectionIssues(
@@ -445,12 +462,13 @@ class ScriptGenerator {
                 // Clear the improvement notification
                 this.notifications.clearNotification(improvementNotificationId);
                 
-                if (improvedScript) {
+                if (improvedScript && improvedScript.trim() && improvedScript.trim() !== finalScript.trim()) {
                     finalScript = improvedScript;
-                    this.notifications.showInfo('Cross-section improvements applied successfully.');
+                    this.notifications.showInfo('Cross-section improvements applied. Re-reviewing...');
+                } else {
+                    this.notifications.showInfo('Cross-section improvement produced no changes. Stopping further attempts.');
+                    break;
                 }
-            } else {
-                this.notifications.showInfo('Final review passed with no cross-section issues found.');
             }
             
             // Update the textarea with the final script
@@ -497,13 +515,70 @@ class ScriptGenerator {
      */
     buildScriptSectionUserPrompt(section, data, partType) {
     
+        // Build aggregated conversation context from all prior sections
+        const aggregatedSummaries = this.buildAggregatedSummaries();
+        const aggregatedTopics = this.buildAggregatedTopics();
+
         return buildScriptSectionUser(
             section,
             this.totalPodcastDuration,
             this.lastDialogueExchanges,
             this.topicsSummary,
-            partType
+            partType,
+            aggregatedSummaries,
+            aggregatedTopics
         );
+    }
+
+    /**
+     * Build aggregated summaries for all prior sections (ordered)
+     * @returns {string} - Aggregated summary text
+     */
+    buildAggregatedSummaries() {
+    
+        if (!this.allSectionSummaries || this.allSectionSummaries.length === 0) {
+            return '';
+        }
+        const lines = this.allSectionSummaries.map(item => {
+            const num = item.number || '';
+            const title = item.title || '';
+            const sum = (item.summary || '').replace(/\s+/g, ' ').trim();
+            return `Section ${num} (${title}): ${sum}`.trim();
+        });
+        return lines.join('\n');
+    }
+
+    /**
+     * Build aggregated topics covered across all prior sections (deduplicated lines)
+     * @returns {string} - Aggregated topics list text
+     */
+    buildAggregatedTopics() {
+    
+        if (!this.allTopicsCovered || this.allTopicsCovered.length === 0) {
+            return '';
+        }
+        const seen = new Set();
+        const out = [];
+        for (const item of this.allTopicsCovered) {
+            const block = item.topics || '';
+            const lines = block.split(/\r?\n/);
+            for (let line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    continue;
+                }
+                // Normalize bullet prefix; keep original line if it starts with '-'
+                const normalizedForKey = trimmed.replace(/^[-*]\s*/, '').toLowerCase();
+                if (seen.has(normalizedForKey)) {
+                    continue;
+                }
+                seen.add(normalizedForKey);
+                // Ensure bullet formatting
+                const bullet = trimmed.startsWith('-') ? trimmed : `- ${trimmed}`;
+                out.push(bullet);
+            }
+        }
+        return out.join('\n');
     }
     
     /**
@@ -540,7 +615,7 @@ class ScriptGenerator {
             
             // Configure options
             const options = {
-                maxTokens: 2000,
+                /*maxTokens: 2000,*/
                 temperature: 0.7
             };
             
@@ -577,38 +652,53 @@ class ScriptGenerator {
                 // Previous sections for context in verification
                 const previousSections = [...this.generatedSections]; // Copy current sections before adding this one
                 
-                // Perform section verification
-                const verificationNotificationId = Date.now();
-                this.notifications.showInfo(`Verifying section ${section.number} quality...`, verificationNotificationId);
-                
-                const verificationResult = await this.verifyScriptSection(
-                    sectionText,
-                    section,
-                    previousSections,
-                    documentContent,
-                    characterData,
-                    apiData
-                );
-                
-                // Clear the verification notification
-                this.notifications.clearNotification(verificationNotificationId);
-                
-                // Log verification feedback to console
-                this.logVerificationFeedback(`Section ${section.number} Verification`, verificationResult);
-                // Composite progress: after verification stage
-                const afterVer = this.computeSectionCompositePercent(i, n, SEC_GEN + SEC_VER);
-                this.updateCompositeProgress('script-progress', afterVer);
-                
-                // If section needs improvement, try to improve it
+                // Iterative verification and improvement (up to 3 attempts)
                 let finalSectionText = sectionText;
-                if (!verificationResult.isValid) {
+                let attempt = 0;
+                const maxAttempts = 3;
+                let verificationResult = { isValid: true, feedback: '' };
+                
+                while (attempt < maxAttempts) {
+                    attempt++;
+                    // Perform section verification
+                    const verificationNotificationId = Date.now();
+                    this.notifications.showInfo(`Verifying section ${section.number} quality (attempt ${attempt}/${maxAttempts})...`, verificationNotificationId);
+                    
+                    verificationResult = await this.verifyScriptSection(
+                        finalSectionText,
+                        section,
+                        previousSections,
+                        documentContent,
+                        characterData,
+                        apiData
+                    );
+                    
+                    // Clear the verification notification
+                    this.notifications.clearNotification(verificationNotificationId);
+                    
+                    // Log verification feedback to console
+                    this.logVerificationFeedback(`Section ${section.number} Verification (Attempt ${attempt})`, verificationResult);
+                    // Composite progress: after verification stage
+                    const afterVer = this.computeSectionCompositePercent(i, n, SEC_GEN + SEC_VER);
+                    this.updateCompositeProgress('script-progress', afterVer);
+                    
+                    if (verificationResult.isValid) {
+                        this.notifications.showInfo(`Section ${section.number} verification passed on attempt ${attempt}.`);
+                        break;
+                    }
+                    
+                    if (attempt >= maxAttempts) {
+                        this.notifications.showInfo(`Max improvement attempts reached for section ${section.number}. Proceeding with best version available.`);
+                        break;
+                    }
+                    
                     // Show improvement notification
                     const improvementNotificationId = Date.now();
-                    this.notifications.showInfo(`Improving section ${section.number}...`, improvementNotificationId);
+                    this.notifications.showInfo(`Improving section ${section.number} (attempt ${attempt}/${maxAttempts})...`, improvementNotificationId);
                     
                     // Attempt to improve the section
                     const improvedSection = await this.improveScriptSection(
-                        sectionText,
+                        finalSectionText,
                         verificationResult.feedback,
                         section,
                         previousSections,
@@ -620,24 +710,20 @@ class ScriptGenerator {
                     // Clear the improvement notification
                     this.notifications.clearNotification(improvementNotificationId);
                     
-                    if (improvedSection) {
+                    if (improvedSection && improvedSection.trim() && improvedSection.trim() !== finalSectionText.trim()) {
                         finalSectionText = this.processScriptText(improvedSection);
-                        this.notifications.showInfo(`Section ${section.number} improved based on feedback.`);
+                        this.notifications.showInfo(`Section ${section.number} improved. Re-verifying...`);
                         // Composite progress: after improvement stage
                         const afterImp = this.computeSectionCompositePercent(i, n, SEC_GEN + SEC_VER + SEC_IMP);
                         this.updateCompositeProgress('script-progress', afterImp);
                     } else {
-                        this.notifications.showInfo(`Section ${section.number} could not be improved, using original.`);
-                        // Move to section end even without improvement
-                        const afterSection = this.computeSectionCompositePercent(i, n, 1.0);
-                        this.updateCompositeProgress('script-progress', afterSection);
+                        this.notifications.showInfo(`Section ${section.number} did not change after improvement attempt. Stopping further attempts.`);
+                        break;
                     }
-                } else {
-                    this.notifications.showInfo(`Section ${section.number} verification passed.`);
-                    // Move to section end when no improvement needed
-                    const afterSection = this.computeSectionCompositePercent(i, n, 1.0);
-                    this.updateCompositeProgress('script-progress', afterSection);
                 }
+                // Move to section end
+                const afterSection = this.computeSectionCompositePercent(i, n, 1.0);
+                this.updateCompositeProgress('script-progress', afterSection);
                 
                 // Store this section for summary generation
                 this.generatedSections.push({
@@ -828,8 +914,12 @@ class ScriptGenerator {
         let processedText = text
             .replace(/\r\n/g, '\n')
             .replace(/\r/g, '\n')
-            .replace(/```[a-zA-Z-]*\s*\n?/g, '')
-            .replace(/```/g, '');
+            // Remove opening code fences like ```markdown, ``` md, ```
+            .replace(/```\s*[a-zA-Z-]*\s*\n?/g, '')
+            // Remove any remaining triple backticks
+            .replace(/```/g, '')
+            // Remove stray lines that only say 'markdown' or 'md'
+            .replace(/^(?:markdown|md)\s*$/gim, '');
         
         // Fix cases where separator and label are on the same line (e.g., ---HOST: or --- GUEST:)
         processedText = processedText.replace(/(^|\n)---\s*(HOST|GUEST):/g, '$1---\n$2:');
@@ -941,7 +1031,7 @@ class ScriptGenerator {
             
             // Configure options
             const options = {
-                maxTokens: 300,
+                /*maxTokens: 300,*/
                 temperature: 0.5
             };
             
@@ -981,6 +1071,18 @@ class ScriptGenerator {
                 
                 // Store the last section summary
                 this.lastSectionSummary = generalSummary;
+
+                // Append to cumulative arrays (no size caps)
+                this.allSectionSummaries.push({
+                    number: lastSection.number,
+                    title: lastSection.title,
+                    summary: generalSummary
+                });
+                this.allTopicsCovered.push({
+                    number: lastSection.number,
+                    title: lastSection.title,
+                    topics: topicsText
+                });
             }
             
         } catch (error) {

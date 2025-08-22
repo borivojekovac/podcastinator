@@ -71,10 +71,65 @@ class OutlineVerifier {
                 const jsonMatch = verificationText.match(/{[\s\S]*}/m);
                 if (jsonMatch) {
                     const resultJson = JSON.parse(jsonMatch[0]);
-                    return {
-                        isValid: !!resultJson.isValid,
-                        feedback: resultJson.feedback || 'No specific feedback provided.'
-                    };
+                    
+                    // Handle the new richer JSON feedback format
+                    if (resultJson.issues && Array.isArray(resultJson.issues)) {
+                        // Format the issues into a readable feedback message
+                        let feedbackMessage = '';
+                        
+                        // Add duration information if available
+                        if (resultJson.totalDuration !== undefined && 
+                            resultJson.targetDuration !== undefined) {
+                            feedbackMessage += `Total Duration: ${resultJson.totalDuration} minutes ` +
+                                            `(Target: ${resultJson.targetDuration} minutes, ` +
+                                            `Difference: ${resultJson.durationDelta || 0} minutes)\n\n`;
+                        }
+                        
+                        // Add issues by severity
+                        const criticalIssues = resultJson.issues.filter(function(issue) { return issue.severity === 'critical'; });
+                        const majorIssues = resultJson.issues.filter(function(issue) { return issue.severity === 'major'; });
+                        const minorIssues = resultJson.issues.filter(function(issue) { return issue.severity === 'minor'; });
+                        
+                        if (criticalIssues.length > 0) {
+                            feedbackMessage += 'CRITICAL ISSUES:\n';
+                            criticalIssues.forEach(function(issue) {
+                                feedbackMessage += `- [${issue.category}] ${issue.description}\n`;
+                            });
+                            feedbackMessage += '\n';
+                        }
+                        
+                        if (majorIssues.length > 0) {
+                            feedbackMessage += 'MAJOR ISSUES:\n';
+                            majorIssues.forEach(function(issue) {
+                                feedbackMessage += `- [${issue.category}] ${issue.description}\n`;
+                            });
+                            feedbackMessage += '\n';
+                        }
+                        
+                        if (minorIssues.length > 0) {
+                            feedbackMessage += 'MINOR ISSUES:\n';
+                            minorIssues.forEach(function(issue) {
+                                feedbackMessage += `- [${issue.category}] ${issue.description}\n`;
+                            });
+                            feedbackMessage += '\n';
+                        }
+                        
+                        // Add summary if available
+                        if (resultJson.summary) {
+                            feedbackMessage += `SUMMARY: ${resultJson.summary}`;
+                        }
+                        
+                        return {
+                            isValid: !!resultJson.isValid,
+                            feedback: feedbackMessage.trim() || 'No specific issues found.'
+                        };
+                    } else {
+                        // Fallback for backward compatibility
+                        return {
+                            isValid: !!resultJson.isValid,
+                            feedback: resultJson.feedback || 'No specific feedback provided.'
+                        };
+                    }
                 } else {
                     const isPositive = verificationText.toLowerCase().includes('valid') ||
                                        verificationText.toLowerCase().includes('accurate') ||

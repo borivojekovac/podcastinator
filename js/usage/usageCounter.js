@@ -9,8 +9,12 @@ class UsageCounter {
         this.notifications = new NotificationsManager();
         
         // Default model costs per 1k tokens (in USD)
-        this.defaultCosts = {
+        this.defaultCosts =
+        {
             // Content models
+            "gpt-5": { "input": 0.00125, "output": 0.01000 },
+            "gpt-5-mini": { "input": 0.00025, "output": 0.00200 },
+            "gpt-5-nano": { "input": 0.00005, "output": 0.00040 },
             'gpt-4.1': { input: 0.01, output: 0.03 },
             'gpt-4.1-mini': { input: 0.005, output: 0.015 },
             'gpt-4.1-nano': { input: 0.0025, output: 0.0075 },
