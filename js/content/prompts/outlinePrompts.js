@@ -21,7 +21,7 @@ Formatting (CRITICAL):
 - No dialogue/script—this is an outline only.
 
 Structural guidance:
-- Always include an opening Introduction as section 1 and a closing Outro/Conclusion as the last section.
+- Always include an opening Introduction as the first section and a closing Outro/Conclusion as the last section.
 - Prefer 2–3 main sections (< 15 min), 3–5 (15–30 min), 5–8 (30+ min). Create subsections (1.1, 1.2, etc.) for any section longer than 5 minutes.
 - Avoid redundancy; place each fact/topic once where it best fits the flow.
 - If time is tight, drop lower-priority topics rather than cramming.

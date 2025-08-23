@@ -295,57 +295,89 @@ class ScriptGenerator {
         console.log('Parsing outline sections, length:', outlineText.length);
         
         // Split by horizontal rule separators - more forgiving of whitespace
-        const sectionStrings = outlineText.split(/^\s*---\s*$/m).filter(section => section.trim());
+        const sectionStrings = outlineText.split(/^\s*---\s*$/m).filter(function(section) { return section.trim(); });
         
-        console.log('Found', sectionStrings.length, 'sections');
+        console.log('Found', sectionStrings.length, 'top-level blocks');
         
         // Track total duration for validation
         let totalDuration = 0;
-        
-        const sections = sectionStrings.map((sectionStr, index) => {
-            // Extract section number and title
-            const titleMatch = sectionStr.match(/^\s*(\d+(?:\.\d+)*)\.\s+([^\r\n]+)/m);
-            
-            // Extract duration
-            const durationMatch = sectionStr.match(/Duration:\s*(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|min|m)?/mi);
-            let durationMinutes = 0;
-            if (durationMatch) {
-                const value = parseFloat(durationMatch[1]);
-                const unitRaw = (durationMatch[2] || '').trim().toLowerCase();
-                if (!unitRaw || unitRaw.startsWith('m')) {
-                    // Treat as minutes when unit is missing or minutes-like (minute/min/mins/m)
-                    durationMinutes = value;
-                } else if (unitRaw.startsWith('s')) {
-                    // Convert seconds to minutes
-                    durationMinutes = value / 60;
-                } else {
-                    // Fallback: assume minutes
-                    durationMinutes = value;
-                }
+        const sections = [];
+
+        // Helper: parse a numeric duration string within a slice
+        function parseDurationMinutes(slice) {
+            const durationMatch = slice.match(/Duration:\s*(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|min|m)?/mi);
+            if (!durationMatch) {
+                return null;
             }
-            
-            // Extract overview
-            const overviewMatch = sectionStr.match(/Overview:\s*([^\r\n]+)/m);
-            
-            // Add to total duration
-            totalDuration += durationMinutes;
-            
-            const section = {
-                id: index + 1,
-                number: titleMatch ? titleMatch[1] : `${index + 1}`,
-                title: titleMatch ? titleMatch[2] : `Section ${index + 1}`,
-                durationMinutes: durationMinutes,
-                overview: overviewMatch ? overviewMatch[1] : 'No overview provided',
-                content: sectionStr.trim()
-            };
-            
-            console.log(`Section ${index + 1}:`, section.title, '(', section.durationMinutes, 'min)');
-            
-            return section;
-        });
+            const value = parseFloat(durationMatch[1]);
+            const unitRaw = (durationMatch[2] || '').trim().toLowerCase();
+            if (!unitRaw || unitRaw.startsWith('m')) {
+                return value;
+            }
+            if (unitRaw.startsWith('s')) {
+                return value / 60;
+            }
+            return value;
+        }
+
+        // For each block, further split by numbered headings (supports 1., 3.1., 4.2.1 etc.)
+        for (let b = 0; b < sectionStrings.length; b++) {
+            const block = sectionStrings[b];
+            // Find all heading matches with their positions
+            const headingRegex = /^\s*(\d+(?:\.\d+)*)\.\s+([^\r\n]+)/gm;
+            const matches = [];
+            let m;
+            while ((m = headingRegex.exec(block)) !== null) {
+                matches.push({ number: m[1], title: m[2], index: m.index });
+            }
+
+            if (matches.length === 0) {
+                // No numbered headings; try to parse the whole block as a single section only if it has a duration
+                const dur = parseDurationMinutes(block);
+                if (dur != null) {
+                    totalDuration += dur;
+                    sections.push({
+                        id: sections.length + 1,
+                        number: `${sections.length + 1}`,
+                        title: 'Section',
+                        durationMinutes: dur,
+                        overview: (block.match(/Overview:\s*([^\r\n]+)/m) || [null, 'No overview provided'])[1],
+                        content: block.trim()
+                    });
+                }
+                continue;
+            }
+
+            // Create slices per heading
+            for (let i = 0; i < matches.length; i++) {
+                const start = matches[i].index;
+                const end = (i + 1 < matches.length) ? matches[i + 1].index : block.length;
+                const slice = block.slice(start, end);
+
+                // Require a duration for a slice to be treated as an actual section
+                const durationMinutes = parseDurationMinutes(slice);
+                if (durationMinutes == null) {
+                    // Skip heading without explicit duration (e.g., a parent heading like "3. Common ...")
+                    continue;
+                }
+
+                totalDuration += durationMinutes;
+                const overviewMatch = slice.match(/Overview:\s*([^\r\n]+)/m);
+                sections.push({
+                    id: sections.length + 1,
+                    number: matches[i].number,
+                    title: matches[i].title,
+                    durationMinutes: durationMinutes,
+                    overview: overviewMatch ? overviewMatch[1] : 'No overview provided',
+                    content: slice.trim()
+                });
+                console.log(`Section ${sections.length}: ${matches[i].number}. ${matches[i].title} (${durationMinutes} min)`);
+            }
+        }
         
         // Store the total duration for use in prompts
         this.totalPodcastDuration = totalDuration;
+        console.log('Total parsed sections:', sections.length, '| Total minutes:', totalDuration);
         
         return sections;
     }

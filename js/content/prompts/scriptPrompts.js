@@ -1,8 +1,5 @@
 // Centralized prompt builders for Script generation/verification/improvement
 
-
-// Centralized prompt builders for Script generation/verification/improvement
-
 // Verification: Section
 export function buildScriptSectionVerificationSystem() {
     return `You are a strict podcast script section reviewer.
@@ -70,33 +67,24 @@ You use the personas and knowledge separation to write the dialogue.
 # Personas
 
 ## HOST
-Name: ${hostName}${hostPersonality ? `
+When HOST speaks, they should realistically incorporate the HOST personality, speaking style, and backstory.
+**Name**: ${hostName}
+**Information available**: Knows the outline and what was said so far. Does not cite document specifics unless the GUEST brings them in.${hostPersonality ? `
+**Personality**: ${hostPersonality}` : ''}${hostStyle ? `
+**Speaking style**: ${hostStyle}` : ''}${hostBackstory ? `
 
-### Personality
-${hostPersonality}` : ''}${hostStyle ? `
-
-### Speaking style
-${hostStyle}` : ''}${hostBackstory ? `
 ### Backstory
 ${hostBackstory}` : ''}
 
 ## GUEST
-Name: ${guestName}${guestPersonality ? `
-
-### Personality
-${guestPersonality}` : ''}${guestStyle ? `
-
-### Speaking style
-${guestStyle}` : ''}${guestBackstory ? `
+When GUEST speaks, they should realistically incorporate the GUEST personality, speaking style, and backstory.
+**Name**: ${guestName}
+**Information available**: Uses the document's (Ground truth) facts naturally as personal knowledge (never say "the document says").${guestPersonality ? `
+**Personality**: ${guestPersonality}` : ''}${guestStyle ? `
+**Speaking style**: ${guestStyle}` : ''}${guestBackstory ? `
 
 ### Backstory
 ${guestBackstory}` : ''}
-
-## Persona Roles
-Roles and knowledge separation (CRITICAL):
-- HOST: podcast host. Knows the outline and what was said so far. Does not cite document specifics unless the GUEST brings them in.
-- GUEST: expert guest. Uses the document’s facts naturally as personal knowledge (never say "the document says").
-- When HOST or GUEST speak, they should use the persona's personality, speaking style, and backstory.
 
 ${documentContent ? `# Ground truth
 - Implicitly accessible only to GUEST:
@@ -104,8 +92,11 @@ ${documentContent ? `# Ground truth
 ${documentContent}
 \`\`\`` : ''}
 
-# Focus
-${podcastFocus || '(none)'}
+${podcastFocus ? `
+# Focus / steer
+\`\`\` markdown
+${podcastFocus}
+\`\`\`` : ""}
 
 # Output format (CRITICAL)
 - Use blocks starting with '---' on a line by itself.
@@ -115,23 +106,6 @@ ${podcastFocus || '(none)'}
 
 # Duration discipline
 - Write enough words to meet the section's target at 160 wpm, using depth, examples, and analogies where appropriate.
-
-# Part tone
-- section: continue naturally from prior content without resetting the show.
-
-# Intro flow (CRITICAL)
-- Start with HOST.
-- Welcome listeners to the show and state the overarching topic succinctly.
-- You always MUST introduce GUEST with 1–2 relevant credentials (no resume dump).
-- GUEST MUST acknowledge/thank briefly (1 line max).
-- Set expectations: 1–2 sentences on what listeners will learn.
-- Smooth handoff into the first substantive question (avoid generic small talk).
-
-# Outro flow (CRITICAL)
-- Brief recap: 2–3 concise takeaways from this episode.
-- HOST thanks GUEST.
-- GUEST offers a short closing remark (optional pointer or reflection; no new topics).
-- Clear HOST sign‑off to listeners. Keep it tight and natural.
 `;
 }
 
@@ -144,8 +118,28 @@ export function buildScriptSectionUser(section, totalPodcastDuration, lastDialog
 # Task
 Write the ${partType || 'section'} of a podcast conversation following the system rules.
 
-## Outline section (reference only; do NOT copy wording):
+## Outline (reference only; do NOT copy wording):
 ${section.content}
+
+## Section instructions
+- Follow the outline and the system rules, target ~${wordsTarget} words length.
+- Do not discuss topics that were already discussed; you can build on top of previous topics per outline, but without repeating explanations or facts etc.
+${((partType || 'section') == "intro") ? `- This is a first, introductory segment of the podcast.
+- Start this section with HOST.
+- Welcome listeners to the show and state the overarching topic succinctly.
+- You always MUST introduce GUEST with 1–2 relevant credentials (no resume dump).
+- GUEST MUST acknowledge/thank briefly (1 line max).
+- Set expectations: 1–2 sentences on what listeners will learn.
+- DO NOT end this segment with a question, conclusion, sign-off or summary.` : "" }
+${((partType || 'section') == "section") ? `- This section of the podcast is a regular section, not first, and not the last one in the whole podcast.
+- Guest has been introduced and overall and podcast theme has been set.
+- Start this section with HOST or GUEST, depending on what's natural continuation of the Previous dialogue, provided below.
+- DO NOT end this segment with a question, conclusion, sign-off or summary.` : "" }
+${((partType || 'section') == "outro") ? `- Start this section with HOST or GUEST, depending on what's natural continuation of the Previous dialogue, provided below.
+- Include brief recap: 2–3 concise takeaways from this episode.
+- HOST thanks GUEST.
+- GUEST offers a short closing remark (optional pointer or reflection; no new topics).
+- Clear HOST sign‑off to listeners. Keep it tight and natural.` : "" }
 
 ## Title
 ${section.title}
@@ -174,7 +168,6 @@ ${topicsSummary}
 ` : ''}
 
 ## Strict requirements
-- Continue naturally; if previous dialogue is provided, start with the other speaker.
 - Meet target of ~${wordsTarget} words with substantive, grounded detail.
 - HOST asks curious layperson questions; GUEST provides expert, document-grounded answers.
 - Avoid repeating already-covered topics unless explicitly building on them.
@@ -276,7 +269,8 @@ export function buildScriptSectionImproveSystem() {
 Rules:
 - Apply precise, minimal edits to fully address each feedback issue.
 - Preserve unaffected dialogue; keep '---' separators and HOST:/GUEST: labels.
-- Fix duration shortfall first: compute current word count and expand with grounded detail or reduce details to reach the target words (160 wpm). When expanding adding depth, examples, analogies to GUEST answers and short HOST follow-ups. When shortening, strategically rephrase, summarize or completely remove parts, to reach the target word count while maintaining the core message as much as possible.
+- Fix duration shortfall first: compute current word count and expand with grounded detail or reduce details to reach the target words (160 wpm). When expanding adding depth, examples, analogies to GUEST answers and short HOST follow-ups. When shortening, strategically rephrase, summarize or completely remove parts to reach the target word count while maintaining as much of the meaning as possible.
+- When removing redundancy, retain any new information or insights that were added, compensate with adding depth, examples, analogies from the ground-truth document, and short HOST follow-ups to maintain the same approximate duration.
 - Implement each issue's "actions" precisely where indicated by the "evidence" quotes. If locations are ambiguous, fix the first matching occurrence.
 - Address ALL issues: FACTS, OUTLINE, DURATION, CONVERSATION, SPEAKER_TURN, CONTINUITY, CHARACTER, FORMAT.
 - Maintain natural alternation; do not introduce triple same-speaker turns; if previous dialogue implies who spoke last, ensure the first turn here is the other speaker.
@@ -316,6 +310,7 @@ export function buildScriptCrossSectionImproveSystem() {
 
 Rules:
 - Focus ONLY on cross-section issues from feedback: redundancy, transitions, continuity, speaker handoffs, flow/character consistency.
+- When removing redundancy, retain any new information or insights that were added, and you MUST compensate by adding depth, examples, analogies from the ground-truth document, and short HOST follow-ups to maintain the same original word count.
 - Preserve unaffected dialogue; keep '---' separators and HOST:/GUEST: labels.
 - Use the evidence and actions to perform surgical edits.
 - Output ONLY the full improved script; no explanations or code fences.`;
@@ -327,6 +322,9 @@ export function buildScriptCrossSectionImproveUser(originalScriptText, feedback,
 
 --- OUTLINE ---
 ${outlineText}
+
+--- DOCUMENT (ground truth) ---
+${documentContent}
 
 --- ORIGINAL SCRIPT ---
 ${originalScriptText}
