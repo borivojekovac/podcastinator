@@ -2,272 +2,205 @@
 
 // Generation prompts
 export function buildOutlineGenerationSystem(host, guest, targetDurationMinutes) {
-    return `You are a podcast outline generator.
-        
-Create a structured outline for a podcast discussion between a host named "${host.name || 'Host'}" 
-(${host.personality ? `personality: ${host.personality}` : ''}) 
-and a guest named "${guest.name || 'Guest'}" (${guest.personality ? `personality: ${guest.personality}` : ''}).
+    return `You are an expert podcast outline planner.
 
-IMPORTANT: The target duration for the entire podcast is ${targetDurationMinutes} minutes. You MUST structure the outline so that each section has an appropriate amount of time allocation, with section durations EXACTLY adding up to ${targetDurationMinutes} minutes total - not more, not less.
+Goal: Design a sectioned outline for a host "${host.name || 'Host'}" and a guest "${guest.name || 'Guest'}" to discuss the provided document content, aligned to user steer, within EXACTLY ${targetDurationMinutes} minutes.
 
-FORMATTING REQUIREMENTS (CRITICAL):
-- DO NOT include code block syntax or language identifiers anywhere in your response
-- DO NOT add any summary text, explanations, or annotations outside of the outline format
-- DO NOT include any total duration summaries at the end
-- ONLY provide the raw outline format with section separators (---), section numbers, titles, durations, and content
-- Your response should begin with --- and contain ONLY the outline
+Hard rules (in priority order):
+1) FACT CHECK: Only include topics, claims, and examples that appear in the provided document. No outside knowledge or assumptions.
+2) DURATION: Section durations must sum to EXACTLY ${targetDurationMinutes} minutes. Enforce realistic coverage using 160 words per minute as the speaking rate to gauge feasibility.
+3) CONVERSATION QUALITY: Plan a natural, flowing conversation where the host has layperson understanding and the guest is the subject-matter expert.
 
-The outline MUST follow this EXACT format with section separators and duration for easy parsing:
+Formatting (CRITICAL):
+- Output ONLY the outline. No code fences, no extra commentary, no totals at the end.
+- Use '---' as a separator before every section block.
+- Each section starts with: "<number>. <Title>" on the first line (e.g., "1. Introduction", "2. Main Theme", "1.1. Subtopic").
+- Include a line: "Duration: <number> minutes" (minutes or min are acceptable).
+- Include a line: "Overview: <one concise sentence>".
+- Optionally include a "KEY FACTS:" list with bullets to anchor discussion to document facts. Aim ~1–2 bullets per minute of section duration.
+- No dialogue/script—this is an outline only.
 
----
-1. [Section Title]
-Duration: [Target duration in minutes]
-Overview: [Brief summary of the discussion points and topics for this section]
-KEY FACTS:
-- [3-5 specific facts, concepts, or points to cover]
-- [3-5 specific topics to cover]
-UNIQUE FOCUS: [Brief description of what makes this section distinct from others]
-CARRYOVER: [Brief description of topics that build on previous sections]
----
-1.1. [Subsection Title]
-Duration: [Target duration in minutes]
-Overview: [Brief summary of the discussion points for this subsection]
-KEY FACTS:
-- [3-5 specific facts, concepts, or points to cover]
-- [3-5 specific topics to cover]
-UNIQUE FOCUS: [Brief description of what makes this section distinct from others]
-CARRYOVER: [Brief description of topics that build on previous sections]
----
+Structural guidance:
+- Always include an opening Introduction as section 1 and a closing Outro/Conclusion as the last section.
+- Prefer 2–3 main sections (< 15 min), 3–5 (15–30 min), 5–8 (30+ min). Create subsections (1.1, 1.2, etc.) for any section longer than 5 minutes.
+- Avoid redundancy; place each fact/topic once where it best fits the flow.
+- If time is tight, drop lower-priority topics rather than cramming.
 
-1. Create a clear, hierarchical structure with main sections and subsections
-2. Each section must include:
-   - Section number (e.g., 1, 1.1, 2, etc.)
-   - A descriptive title
-   - Duration in minutes
-   - Overview that summarizes the key points for that section
-   - KEY FACTS: Include specific facts, concepts, or points to cover (1-2 key facts per minute of section duration)
-   - UNIQUE FOCUS: Describe what makes this section distinct from others
-   - CARRYOVER: Note any topics that build on previous sections (use "None" if this is the first section or completely independent)
-3. Use horizontal rule separators (---) between each section for easy parsing
-4. CRITICAL: Ensure all section durations add up to EXACTLY the target podcast length of ${targetDurationMinutes} minutes - this is a strict requirement
-5. Organize content logically with natural flow between sections
-6. Balance depth vs. breadth based on available time:
-   - For podcasts under 15 minutes: Focus on 2-3 main sections with minimal subsections
-   - For 15-30 minute podcasts: Use 3-5 main sections with relevant subsections
-   - For 30+ minute podcasts: Develop 5-8 main sections with multiple subsections
-   - Scale the number of key facts proportionally to section duration (1-2 facts per minute)
-7. Distribute topics strategically to minimize redundancy across sections
-8. Be realistic about what can be covered in the allocated time - fewer, well-developed topics are better than many rushed topics
-9. Ensure the KEY FACTS for each section can be reasonably discussed in the allocated time
+Introduction section guidance (CRITICAL):
+- Start with HOST.
+- Welcome listeners to the show and state the overarching topic succinctly.
+- You always MUST introduce GUEST with 1–2 relevant credentials (no resume dump).
+- GUEST MUST acknowledge/thank briefly (1 line max).
+- Set expectations: 1–2 sentences on what listeners will learn.
+- Smooth handoff into the first substantive question (avoid generic small talk).
 
-## Example Format:
-
----
-1. Introduction
-Duration: 3 minutes
-Overview: Brief exchange of credentials and establishing expertise.
-KEY FACTS: (3 facts for this 3-minute section, following the 1 fact per minute guideline)
-- Host introduces guest's background and expertise
-- Overview of what will be covered in the podcast
-- Why this topic is relevant to the audience
-UNIQUE FOCUS: Setting the foundation and establishing credibility
-CARRYOVER: None
----
-1.2. Topic Relevance
-Duration: 2 minutes
-Overview: Discussion of why this topic matters to the audience.
-KEY FACTS: (2 facts for this 2-minute section, following the 1 fact per minute guideline)
-- Current relevance and timeliness of the topic
-- Impact on the target audience
-UNIQUE FOCUS: Establishing importance and audience connection
-CARRYOVER: Builds on guest's expertise established in introduction
----
-2. Main Topic Section
-Duration: 7 minutes
-Overview: Detailed exploration of the central theme with expert insights.
-KEY FACTS: (7 facts for this 7-minute section, following the 1 fact per minute guideline)
-- Core concept explanation
-- Expert analysis and insights
-- Real-world examples or case studies
-- Historical context of the topic
-- Current trends and developments
-- Common misconceptions
-- Practical applications for listeners
-UNIQUE FOCUS: Deep dive into the main subject matter
-CARRYOVER: Expands on the topic relevance discussed earlier
----
-
-DO NOT include actual dialogue or script. This is only an outline with clear section separators for parsing. Ensure KEY FACTS are specific and actionable, UNIQUE FOCUS explains what distinguishes each section, and CARRYOVER tracks topic continuity.`;
+Conclusion section guidance (CRITICAL):
+- Brief recap: 2–3 concise takeaways from the whole episode.
+- HOST thanks GUEST.
+- GUEST offers a short closing remark (optional pointer or reflection; no new topics).
+- Clear HOST sign‑off to listeners. Keep it tight and natural.`;
 }
 
 export function buildOutlineGenerationUser(documentContent, podcastDuration, podcastFocus) {
-    if (podcastFocus && podcastFocus.trim().length > 0) {
-        return `Generate a podcast outline based on the following focus & overall instructions: "${podcastFocus.trim()}"
+    const steer = (podcastFocus && podcastFocus.trim()) ? `Podcast steer: ${podcastFocus.trim()}` : 'Podcast steer: (none provided)';
+    return `Task: Create a podcast outline strictly following the system rules.
 
-Document content:
-\`\`\` markdown
+${steer}
+Target duration: ${podcastDuration} minutes (sum of section durations must equal ${podcastDuration}).
+
+Document (sole source of truth — do not invent facts):
 ${documentContent}
-\`\`\`
 
-Create a well-organized outline that focuses specifically on the requested topic in a conversational podcast format. The outline MUST:
-1) Begin with an Introduction section (first section) that sets context and introduces the guest.
-2) End with an Outro/Conclusion section (final section) that wraps up, thanks the guest, and provides a sign-off.
-3) Ensure the total duration is EXACTLY ${podcastDuration} minutes, with each section duration specified. This is a STRICT requirement - the sum of all section durations MUST equal ${podcastDuration} minutes, not more and not less.
-4) Adapt the outline structure based on the total podcast duration:
-   - For podcasts under 15 minutes: Use 2-3 main sections with minimal subsections
-   - For 15-30 minute podcasts: Use 3-5 main sections with relevant subsections
-   - For 30+ minute podcasts: Use 5-8 main sections with multiple subsections
-5) Scale the detail level appropriately - include 1-2 key facts per minute for each section
-6) Create subsections for any section longer than 5 minutes to improve structure
-7) Be realistic about what can be covered in each section based on its duration
-8) Do not attempt to cover too many topics in a short duration
-9) If a section has X minutes, include only topics that can be meaningfully discussed in that timeframe`;
-    }
-
-    return `Generate a podcast outline based on the following document content:
-
-\`\`\` markdown
-${documentContent}
-\`\`\`
-
-Create a well-organized outline that covers the key information from this document in a conversational podcast format. The outline MUST:
-1) Begin with an Introduction section (first section) that sets context and introduces the guest.
-2) End with an Outro/Conclusion section (final section) that wraps up, thanks the guest, and provides a sign-off.
-3) Ensure the total duration is EXACTLY ${podcastDuration} minutes, with each section duration specified. This is a STRICT requirement - the sum of all section durations MUST equal ${podcastDuration} minutes, not more and not less.
-4) Adapt the outline structure based on the total podcast duration:
-   - For podcasts under 15 minutes: Use 2-3 main sections with minimal subsections
-   - For 15-30 minute podcasts: Use 3-5 main sections with relevant subsections
-   - For 30+ minute podcasts: Use 5-8 main sections with multiple subsections
-5) Scale the detail level appropriately - include 1-2 key facts per minute for each section
-6) Create subsections for any section longer than 5 minutes to improve structure
-7) Be realistic about what can be covered in each section based on its duration
-8) Do not attempt to cover too many topics in a short duration
-9) If a section has X minutes, include only topics that can be meaningfully discussed in that timeframe`;
+Requirements to satisfy:
+- Ground all sections and KEY FACTS in the document.
+- Make the flow natural for a host (layperson perspective) and a guest (expert perspective).
+- Ensure feasibility at 160 wpm: pick a realistic number of topics per section (about 1–2 bullets per minute).
+- Output ONLY the outline in the exact format with '---' separators, numbered titles, Duration, and Overview.
+`;
 }
 
 // Verification prompts
 export function buildOutlineVerificationSystem() {
-    return `You are a podcast outline quality reviewer. Your job is to analyze a generated podcast outline for:
+    return `You are a strict podcast outline reviewer.
 
-1. STRUCTURE QUALITY: Ensure the outline has a logical structure with appropriate sections
-2. TIMING ACCURACY (IMPORTANT):
-   - Verify that section durations add up to approximately the target podcast duration
-   - A slight deviation of up to 2 minutes (over or under) is acceptable for podcasts 30+ minutes long
-   - A slight deviation of up to 1 minute is acceptable for podcasts under 30 minutes
-   - Any deviation larger than these thresholds should be flagged as an issue
-   - Confirm the number and depth of sections are appropriate for the target duration:
-     * Podcasts under 15 minutes: 2-3 main sections with minimal subsections
-     * Podcasts 15-30 minutes: 3-5 main sections with relevant subsections
-     * Podcasts 30+ minutes: 5-8 main sections with multiple subsections
-   - Check that longer sections (5+ minutes) have appropriate subsections
-   - Verify key facts scale proportionally to section duration (1-2 facts per minute)
-3. TOPICAL COVERAGE: Check that the outline appears to cover the main topics with appropriate emphasis
-4. FOCUS ALIGNMENT: Confirm the outline aligns with any user-specified focus/steer
-5. FORMAT CORRECTNESS: Ensure the outline follows the required section numbering and separator format
+Review priorities:
+1) FACT CHECK: Every section topic and each KEY FACT must be supported by the provided document. Flag anything not grounded.
+2) DURATION: Sum of section durations must equal the target exactly. If not exact, this is a critical timing error. Also assess feasibility using 160 words/minute; flag overcrowded sections.
+3) CONVERSATION QUALITY: Flow should be natural (intro ➜ body ➜ outro), with host as layperson and guest as expert; sections should be non-redundant and align to any steer.
+4) FORMAT: Must follow exact outline format: '---' separators; first line is numbered title (e.g., 2. Title or 1.1. Title); include Duration and Overview lines. No extra commentary or code fences in the outline.
 
-Respond with a JSON object containing:
-- "isValid": true if the outline meets all quality criteria (including acceptable duration range), false otherwise
-- "issues": An array of specific issues found, each with:
-  * "category": The category of the issue ("TIMING", "STRUCTURE", "CONTENT", "FORMAT", "FOCUS")
-  * "description": Detailed description of the issue
-  * "severity": "critical", "major", or "minor"
-- "totalDuration": The calculated total duration from all sections
-- "targetDuration": The specified target duration
-- "durationDelta": The difference between total and target duration (can be positive or negative)
-- "summary": A brief overall assessment
+Respond with JSON ONLY (no backticks, no prose), using this structure:
+{
+  "isValid": boolean,
+  "issues": [
+    {
+      "category": "TIMING"|"FACTS"|"FOCUS"|"STRUCTURE"|"FORMAT",
+      "severity": "critical"|"major"|"minor",
+      "description": string,                // what is wrong
+      "section": string|null,               // e.g., "1", "2.1"; null if global
+      "evidence": string,                   // quote/paraphrase from outline and where document contradicts or lacks support
+      "fix": string,                        // specific instruction to improver: what to change and how
+      "actions": [string],                  // step-by-step edits (surgical)
+      "suggestedDuration": number|null,     // if timing edit is needed for this section
+      "notes": string                       // rationale for the change
+    }
+  ],
+  "totalDuration": number,                  // sum of all section durations detected
+  "targetDuration": number,                 // provided target
+  "durationDelta": number,                  // totalDuration - targetDuration
+  "summary": string                         // brief assessment
+}
 
-Example response for an invalid outline with these issues:
+Examples:
 
-For a valid outline with acceptable duration, return a similar JSON structure with empty issues array.
+// Invalid outline (timing + ungrounded fact + structure)
+{
+  "isValid": false,
+  "issues": [
+    {
+      "category": "TIMING",
+      "severity": "critical",
+      "description": "Total duration 28 != target 30 (delta -2).",
+      "section": null,
+      "evidence": "Summed durations across 6 sections equals 28 minutes.",
+      "fix": "Increase durations by +2 minutes in total while keeping feasibility at 160 wpm; extend Section 2 by +1 and Section 4 by +1.",
+      "actions": [
+        "Update Section 2 'Duration' from 4 to 5 minutes",
+        "Update Section 4 'Duration' from 6 to 7 minutes"
+      ],
+      "suggestedDuration": null,
+      "notes": "Balances time without overcrowding shorter sections."
+    },
+    {
+      "category": "FACTS",
+      "severity": "major",
+      "description": "Section 3 includes a claim not supported by the document.",
+      "section": "3",
+      "evidence": "KEY FACTS bullet 'Market doubled in 2024' has no source in the provided text.",
+      "fix": "Remove ungrounded bullet and replace with a document-supported statistic from the 'Trends' paragraph.",
+      "actions": [
+        "Delete the bullet 'Market doubled in 2024' in Section 3",
+        "Add a bullet with the exact statistic quoted from the 'Trends' paragraph"
+      ],
+      "suggestedDuration": null,
+      "notes": "Maintains factual integrity and alignment with source."
+    },
+    {
+      "category": "STRUCTURE",
+      "severity": "minor",
+      "description": "Section 5 (7 minutes) lacks subsections despite exceeding 5 minutes.",
+      "section": "5",
+      "evidence": "Single block at 7 minutes without 5.1/5.2 segmentation.",
+      "fix": "Split into two subsections (5.1 and 5.2) with 4 and 3 minutes respectively; distribute KEY FACTS accordingly.",
+      "actions": [
+        "Create '5.1. <Retain Title Part A>' Duration: 4 minutes",
+        "Create '5.2. <Retain Title Part B>' Duration: 3 minutes",
+        "Move advanced points to 5.2"
+      ],
+      "suggestedDuration": 7,
+      "notes": "Improves pacing and clarity."
+    }
+  ],
+  "totalDuration": 28,
+  "targetDuration": 30,
+  "durationDelta": -2,
+  "summary": "Fails duration; contains one ungrounded fact; minor structural adjustment recommended."
+}
 
-NOTE: When presenting the outline to the user after verification, DO NOT include any code block syntax, language identifiers, duration summaries, or any text outside the official outline format.`;
+// Valid outline
+{
+  "isValid": true,
+  "issues": [],
+  "totalDuration": 30,
+  "targetDuration": 30,
+  "durationDelta": 0,
+  "summary": "Outline is grounded, totals match, flow and format are sound."
+}`;
 }
 
 export function buildOutlineVerificationUser(outlineText, documentContent, podcastDuration, podcastFocus) {
-    return `Please review this podcast outline for quality and structure.
+    const steer = (podcastFocus && podcastFocus.trim()) ? `Podcast steer: ${podcastFocus.trim()}` : 'Podcast steer: (none provided)';
+    return `Review this generated outline against the document and requirements. Return JSON only.
 
-Target Podcast Duration: ${podcastDuration} minutes
-${podcastFocus ? `Podcast Focus: ${podcastFocus}\n` : ''}
+Target duration: ${podcastDuration}
+${steer}
 
---- GENERATED OUTLINE ---
+--- OUTLINE TO REVIEW ---
 ${outlineText}
 
---- ORIGINAL DOCUMENT CONTENT ---
+--- DOCUMENT (ground truth) ---
 ${documentContent}
-
-Verify if this outline has a logical structure, well-balanced sections, and aligns with the target duration and focus. Respond in the required JSON format.`;
+`;
 }
 
 // Improvement prompts
 export function buildOutlineImproveSystem(baseSystemPrompt) {
     return `${baseSystemPrompt}
 
-IMPORTANT INSTRUCTIONS FOR OUTLINE EDITING:
-
-1. MAKE TARGETED CHANGES ONLY - Only modify specific sections mentioned in the feedback. Do not rewrite or restructure unaffected sections.
-2. PRESERVE ORIGINAL STRUCTURE - Keep the same section numbering scheme and overall organization unless specific issues were identified.
-3. MAINTAIN FORMAT INTEGRITY - Your response MUST follow the exact format with section separators (---), section numbers, titles, durations, and overviews.
-4. PRESERVE SECTION DETAILS - Keep the same level of detail in section overviews as the original outline.
-5. MAINTAIN APPROPRIATE DURATIONS - The sum of all section durations should add up to approximately the target podcast length:
-   - For podcasts under 30 minutes, aim for +/- 1 minute of the target
-   - For podcasts 30+ minutes, aim for +/- 2 minutes of the target
-   - Always prioritize fixing significant duration discrepancies first
-6. MAINTAIN APPROPRIATE STRUCTURE - Ensure structure follows the duration-based guidelines:
-   - For podcasts under 15 minutes: 2-3 main sections with minimal subsections
-   - For 15-30 minute podcasts: 3-5 main sections with relevant subsections
-   - For 30+ minute podcasts: 5-8 main sections with multiple subsections
-   - Longer sections (5+ minutes) should have appropriate subsections
-   - KEY FACTS should scale proportionally (1-2 per minute of section duration)
-
-- BE REALISTIC about what can be discussed in the allocated time - ensure each section's content and KEY FACTS can be reasonably covered in its duration
-- Do not try to cover too many topics in short sections - depth is better than breadth
-
-CRITICAL FORMATTING RULES:
-- NEVER include markdown code block syntax (\`\`\`) in your response
-- NEVER include 'markdown' or any other language identifiers in your response
-- NEVER include duration summaries or any other comments outside the outline format
-- DO NOT add any explanatory text or formatting notes
-- ONLY include the exact outline format with section separators (---), numbers, titles, durations, and content
-
-Warning: If your response significantly restructures or simplifies the outline beyond addressing the specific feedback, it will be rejected.`;
+Edit mode rules (CRITICAL):
+- Make precise, minimal edits that fully address the feedback. Do not rewrite unaffected sections.
+- Preserve numbering, separators (---), Duration and Overview lines, and overall structure unless feedback requires a structural change.
+- Fix timing first: reallocate durations so the sum equals the target exactly; prefer trimming/dropping low-priority or off-steer items.
+- Ensure all content is grounded in the document; remove or replace anything not supported.
+- Keep feasibility at 160 wpm with ~1–2 bullets per minute.
+- Output ONLY the full revised outline in the same format; no explanations or code fences.
+`;
 }
 
 export function buildOutlineImproveUser(originalOutlineText, feedback, documentContent, podcastDuration, podcastFocus) {
-    return `You are a podcast outline editor. I have a podcast outline that needs targeted edits based on specific feedback. Your job is to make PRECISE EDITS to address the feedback while preserving the original structure and format.
+    const steer = (podcastFocus && podcastFocus.trim()) ? `Podcast steer: ${podcastFocus.trim()}` : 'Podcast steer: (none provided)';
+    return `Apply the feedback to improve the outline. Produce ONLY the revised outline.
 
-Target Podcast Duration: ${podcastDuration} minutes
-${podcastFocus ? `Podcast Focus: ${podcastFocus}\n` : ''}
+Target duration: ${podcastDuration} minutes (sum must equal ${podcastDuration}).
+${steer}
 
 --- ORIGINAL OUTLINE ---
-\`\`\` markdown
 ${originalOutlineText}
-\`\`\`
 
---- FEEDBACK ON ISSUES ---
-\`\`\` json
+--- FEEDBACK (issues to fix) ---
 ${feedback}
-\`\`\`
 
---- ORIGINAL DOCUMENT CONTENT ---
-\`\`\` markdown
+--- DOCUMENT (ground truth) ---
 ${documentContent}
-\`\`\`
-
-IMPORTANT INSTRUCTIONS:
-
-1. DO NOT REWRITE the entire outline. Make surgical changes ONLY to the specific parts mentioned in the feedback.
-2. If the feedback points to issues in specific sections, ONLY modify those sections.
-3. MAINTAIN ORIGINAL STRUCTURE - Your edited outline should have approximately the same number of sections and subsections as the original (${originalOutlineText.split('---').length - 1} sections).
-4. PRESERVE all section separators (---), numbering, and format from the original outline.
-5. KEEP DETAILED OVERVIEWS - Do not shorten or oversimplify section overviews.
-6. ENSURE DURATION ACCURACY - The total duration should be approximately ${podcastDuration} minutes (within +/- 1 minute for podcasts under 30 minutes, or within +/- 2 minutes for longer podcasts). Fix any significant timing discrepancies first.
-7. BE REALISTIC WITH CONTENT - For each section, only include topics that can be reasonably covered in the allocated time. Fewer well-developed topics are better than many rushed topics.
-8. Return the COMPLETE outline with your targeted edits incorporated.
-
-FORMATTING REQUIREMENTS (EXTREMELY IMPORTANT):
-- DO NOT include code block syntax or language identifiers anywhere in your response
-- DO NOT add any summary text, explanations, or annotations outside of the outline format
-- DO NOT include any total duration summaries at the end
-- ONLY provide the raw outline format with section separators (---), section numbers, titles, durations, and content
-- Your response should begin with --- and contain ONLY the outline`;
+`;
 }

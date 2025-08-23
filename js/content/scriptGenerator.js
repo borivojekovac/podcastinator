@@ -449,9 +449,14 @@ class ScriptGenerator {
                 this.notifications.showInfo(`Applying cross-section improvements (attempt ${csAttempt}/${csMaxAttempts})...`, improvementNotificationId);
                 
                 // Attempt to improve the script with focus on cross-section issues via ScriptImprover
+                // Prefer structured JSON for downstream cross-section improvement if available
+                const csFeedback = (finalVerificationResult && finalVerificationResult.rawJson)
+                    ? JSON.stringify(finalVerificationResult.rawJson)
+                    : finalVerificationResult.feedback;
+
                 const improvedScript = await this.scriptImprover.improveCrossSectionIssues(
                     finalScript,
-                    finalVerificationResult.feedback,
+                    csFeedback,
                     outlineData.outline,
                     documentContent,
                     characterData,
@@ -697,9 +702,14 @@ class ScriptGenerator {
                     this.notifications.showInfo(`Improving section ${section.number} (attempt ${attempt}/${maxAttempts})...`, improvementNotificationId);
                     
                     // Attempt to improve the section
+                    // Prefer structured JSON for downstream improvement if available
+                    const sectionFeedback = (verificationResult && verificationResult.rawJson)
+                        ? JSON.stringify(verificationResult.rawJson)
+                        : verificationResult.feedback;
+
                     const improvedSection = await this.improveScriptSection(
                         finalSectionText,
-                        verificationResult.feedback,
+                        sectionFeedback,
                         section,
                         previousSections,
                         documentContent,

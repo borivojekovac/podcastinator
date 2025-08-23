@@ -302,7 +302,10 @@ class OutlineGenerator {
                     
                     // Update status based on review result
                     isValid = reviewResult.isValid;
-                    feedback = reviewResult.feedback;
+                    // Prefer structured JSON for downstream improvement if available
+                    feedback = (reviewResult && reviewResult.rawJson)
+                        ? JSON.stringify(reviewResult.rawJson)
+                        : reviewResult.feedback;
                     
                     // If still not valid and we haven't reached max iterations, edit the outline
                     if (!isValid && iterationCount < maxIterations) {

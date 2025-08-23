@@ -16,7 +16,7 @@ class OutlineVerifier {
      * @param {Object} apiData
      * @param {number} podcastDuration
      * @param {string} podcastFocus
-     * @returns {Promise<{isValid: boolean, feedback: string}>}
+     * @returns {Promise<{isValid: boolean, feedback: string, rawJson?: Object|null}>}
      */
     async verifyOutline(outlineText, documentContent, characterData, apiData, podcastDuration, podcastFocus) {
         try {
@@ -121,13 +121,15 @@ class OutlineVerifier {
                         
                         return {
                             isValid: !!resultJson.isValid,
-                            feedback: feedbackMessage.trim() || 'No specific issues found.'
+                            feedback: feedbackMessage.trim() || 'No specific issues found.',
+                            rawJson: resultJson
                         };
                     } else {
                         // Fallback for backward compatibility
                         return {
                             isValid: !!resultJson.isValid,
-                            feedback: resultJson.feedback || 'No specific feedback provided.'
+                            feedback: resultJson.feedback || 'No specific feedback provided.',
+                            rawJson: resultJson
                         };
                     }
                 } else {
@@ -136,16 +138,17 @@ class OutlineVerifier {
                                        verificationText.toLowerCase().includes('good');
                     return {
                         isValid: isPositive,
-                        feedback: verificationText.substring(0, 200) + '...'
+                        feedback: verificationText.substring(0, 200) + '...',
+                        rawJson: null
                     };
                 }
             } catch (error) {
                 console.error('Error parsing verification result:', error);
-                return { isValid: true, feedback: 'Unable to parse verification result. Using original outline.' };
+                return { isValid: true, feedback: 'Unable to parse verification result. Using original outline.', rawJson: null };
             }
         } catch (error) {
             console.error('Error during outline verification:', error);
-            return { isValid: true, feedback: 'Verification error. Using original outline.' };
+            return { isValid: true, feedback: 'Verification error. Using original outline.', rawJson: null };
         }
     }
 }
