@@ -28,52 +28,7 @@
     flex-grow: 1;
 }
 
-/* Character preview - show personality traits and voice */
-.character-preview {
-    padding: 1rem;
-    background: var(--white);
-    border-radius: 8px;
-    border: 1px solid var(--light-gray);
-    margin-bottom: 1rem;
-}
-
-.character-preview h3 {
-    margin-top: 0;
-    margin-bottom: 0.75rem;
-    font-size: 1.1rem;
-    color: var(--primary-dark);
-}
-
-.character-preview .character-traits {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.character-preview .character-trait {
-    font-size: 0.85rem;
-    background: var(--light-gray);
-    color: var(--primary-dark);
-    padding: 0.25rem 0.75rem;
-    border-radius: 1rem;
-}
-
-/* Character complete indicator */
-.character-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.25rem;
-    font-size: 0.85rem;
-}
-
-.character-status.complete {
-    color: #2e7d32;
-}
-
-.character-status.incomplete {
-    color: #d32f2f;
-}
+/* Character preview styles removed (widget no longer in UI) */
 
 /* Animation for loading state */
 @keyframes shimmer {

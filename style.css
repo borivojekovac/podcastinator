@@ -12,6 +12,11 @@
     box-sizing: border-box;
 }
 
+/* Reserve space for non-numbered sections to align titles */
+.step-placeholder {
+    visibility: hidden;
+}
+
 :root {
     --primary-accent: #b1c959;
     --primary-dark: #192b37;
@@ -122,6 +127,63 @@ header p {
 
 .section-content {
     padding-left: 48px;
+}
+
+/* Checkbox grid for configuration section */
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px 16px;
+    margin-top: 8px;
+}
+
+.checkbox-grid label {
+    user-select: none;
+}
+
+/* Toggle-style checkboxes */
+.checkbox-grid label.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid #e1e5e9;
+    border-radius: var(--border-radius-button);
+    cursor: pointer;
+    background: var(--white);
+    color: var(--primary-dark);
+    box-shadow: var(--shadow-light);
+    transition: var(--transition);
+}
+
+.checkbox-grid label.toggle:hover {
+    border-color: var(--primary-accent);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-medium);
+}
+
+.checkbox-grid label.toggle input[type="checkbox"] {
+    display: none;
+}
+
+.checkbox-grid label.toggle .toggle-text {
+    font-weight: 600;
+}
+
+/* Pressed state when checked */
+.checkbox-grid label.toggle input[type="checkbox"]:checked + .toggle-text {
+    position: relative;
+}
+
+.checkbox-grid label.toggle:has(input[type="checkbox"]:checked) {
+    background: var(--primary-dark);
+    color: var(--white);
+    border-color: var(--primary-dark);
+}
+
+.checkbox-grid label.toggle:has(input[type="checkbox"]:checked):hover {
+    background: var(--primary-accent);
+    border-color: var(--primary-accent);
 }
 
 /* Model Selection Grid */

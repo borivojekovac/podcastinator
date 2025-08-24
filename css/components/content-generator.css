@@ -65,6 +65,30 @@ input:focus {
     box-shadow: 0 0 0 2px rgba(255, 86, 64, 0.2);
 }
 
+/* Loading state for textareas */
+.content-textarea.is-loading {
+    position: relative;
+    background-image: linear-gradient(90deg, rgba(0,0,0,0.02) 25%, rgba(0,0,0,0.06) 37%, rgba(0,0,0,0.02) 63%);
+    background-size: 400% 100%;
+    animation: cgShimmer 1.2s ease-in-out infinite;
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+.content-textarea.is-loading::after {
+    content: 'Generating…';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+@keyframes cgShimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+
 /* Monospace styling for structured content */
 .content-textarea.monospace {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;

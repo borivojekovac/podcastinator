@@ -6,14 +6,42 @@
     <title>Podcastinator - Document to Podcast Converter</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="container">
+    <body>
+        <div class="container">
         <header>
             <h1>Podcastinator <img src="images/play.svg" alt="Podcast" class="header-icon"></h1>
             <p>Transform your documents into engaging audio podcasts</p>
         </header>
 
         <main>
+            <!-- Configuration Section: Save/Load app configuration -->
+            <section id="config-section" class="workflow-section">
+                <h2>
+                    <span class="step-number step-placeholder"></span>
+                    Configuration
+                </h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label>Include these sections when saving/loading:</label>
+                        <div class="checkbox-grid">
+                            <label class="toggle"><input type="checkbox" id="cfg-ai" checked><span class="toggle-text">AI Parameters</span></label>
+                            <label class="toggle"><input type="checkbox" id="cfg-contents" checked><span class="toggle-text">Contents</span></label>
+                            <label class="toggle"><input type="checkbox" id="cfg-host" checked><span class="toggle-text">Host Character</span></label>
+                            <label class="toggle"><input type="checkbox" id="cfg-guest" checked><span class="toggle-text">Guest Character</span></label>
+                            <label class="toggle"><input type="checkbox" id="cfg-outline" checked><span class="toggle-text">Outline</span></label>
+                            <label class="toggle"><input type="checkbox" id="cfg-script" checked><span class="toggle-text">Script</span></label>
+                            <label class="toggle"><input type="checkbox" id="cfg-audio" checked><span class="toggle-text">Audio</span></label>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <div class="spacer"></div>
+                        <button id="load-config" class="btn-primary">Load</button>
+                        <button id="save-config" class="btn-primary">Save</button>
+                    </div>
+                    <input type="file" id="config-file-input" accept="application/json,.json" hidden />
+                </div>
+            </section>
+
             <!-- Section 1: OpenAI API Credentials -->
             <section id="credentials-section" class="workflow-section active">
                 <h2>
@@ -275,17 +303,6 @@
                             <textarea id="host-voice-instructions" rows="3" placeholder="Custom voice instructions will appear here. You can edit them directly."></textarea>
                         </div>
                         
-                        <!-- Character Preview (shown when character has data) -->
-                        <div class="character-preview" id="host-preview" style="display: none;">
-                            <h3>Host Character Preview</h3>
-                            <div class="character-traits" id="host-traits">
-                                <!-- Will be populated by JS -->
-                            </div>
-                            <div class="character-status complete" id="host-status">
-                                <span id="host-status-icon">✓</span> 
-                                <span id="host-status-text">Character complete</span>
-                            </div>
-                        </div>
                         
                         <!-- Backstory Generation -->
                         <div class="form-group">
@@ -377,17 +394,6 @@
                             <textarea id="guest-voice-instructions" rows="3" placeholder="Custom voice instructions will appear here. You can edit them directly."></textarea>
                         </div>
                         
-                        <!-- Character Preview (shown when character has data) -->
-                        <div class="character-preview" id="guest-preview" style="display: none;">
-                            <h3>Guest Character Preview</h3>
-                            <div class="character-traits" id="guest-traits">
-                                <!-- Will be populated by JS -->
-                            </div>
-                            <div class="character-status complete" id="guest-status">
-                                <span id="guest-status-icon">✓</span> 
-                                <span id="guest-status-text">Character complete</span>
-                            </div>
-                        </div>
                         
                         <!-- Backstory Generation -->
                         <div class="form-group">

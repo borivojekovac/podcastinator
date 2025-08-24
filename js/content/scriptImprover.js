@@ -93,8 +93,9 @@ class ScriptImprover {
             // Do not inject character names/styles to avoid the model switching labels to names
             const fullUserPrompt = userPrompt;
             
-            // Get language setting
-            const scriptLanguage = apiData.models.scriptLanguage || 'english';
+            // Get language setting from scriptData
+            const scriptStore = this.apiManager.storageManager ? this.apiManager.storageManager.load('scriptData', {}) : {};
+            const scriptLanguage = scriptStore.language || 'english';
             
             // Create messages array
             const messages = [
@@ -187,8 +188,9 @@ class ScriptImprover {
             // Create prompts via centralized builders
             const systemPrompt = buildScriptCrossSectionImproveSystem();
             
-            // Get language setting
-            const scriptLanguage = apiData.models.scriptLanguage || 'english';
+            // Get language setting from scriptData
+            const scriptStore2 = this.apiManager.storageManager ? this.apiManager.storageManager.load('scriptData', {}) : {};
+            const scriptLanguage = scriptStore2.language || 'english';
             
             const userPrompt = buildScriptCrossSectionImproveUser(
                 originalScriptText,

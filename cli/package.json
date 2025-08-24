@@ -1,0 +1,11 @@
+{
+  "name": "podcastinator-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "podcastinator": "./index.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  }
+}

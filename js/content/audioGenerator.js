@@ -525,12 +525,16 @@ class AudioGenerator {
                     }
                     
                     // Prepare API request body
+                    // Read current script language from storage
+                    const scriptStore = this.storageManager.load('scriptData', {}) || {};
+                    const scriptLanguage = scriptStore.language || 'english';
+
                     const requestBody = {
                         model: apiData.models.tts,
                         voice: voice,
                         input: text,
                         response_format: 'wav', // Use uncompressed WAV instead of MP3
-                        language: apiData.models.scriptLanguage || 'english'
+                        language: scriptLanguage
                     };
                     
                     // Add voice instructions if available for GPT-4o-mini-TTS

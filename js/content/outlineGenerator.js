@@ -392,7 +392,7 @@ class OutlineGenerator {
      * @param {boolean} isGenerating - Whether generation is in progress
      */
     setGeneratingState(isGenerating) {
-    
+
         this.isGenerating = isGenerating;
         
         if (isGenerating) {
@@ -401,10 +401,24 @@ class OutlineGenerator {
             this.progressContainer.style.display = 'flex';
             this.progressManager.resetProgress('outline-progress');
             this.cancelGeneration = false;
+
+            // Make textarea read-only and add loading animation
+            if (this.outlineTextarea) {
+                this.outlineTextarea.readOnly = true;
+                this.outlineTextarea.classList.add('is-loading');
+                this.outlineTextarea.setAttribute('aria-busy', 'true');
+            }
         } else {
             // Reset UI
             this.generateButton.disabled = false;
             this.progressContainer.style.display = 'none';
+
+            // Restore textarea interactivity and remove loading animation
+            if (this.outlineTextarea) {
+                this.outlineTextarea.readOnly = false;
+                this.outlineTextarea.classList.remove('is-loading');
+                this.outlineTextarea.removeAttribute('aria-busy');
+            }
         }
     }
     

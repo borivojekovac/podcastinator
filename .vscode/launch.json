@@ -10,6 +10,40 @@
             "name": "Launch Chrome against localhost",
             "url": "http://localhost:8080",
             "webRoot": "${workspaceFolder}"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "CLI: run full pipeline",
+            "program": "${workspaceFolder}/cli/index.js",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "run",
+                "-c",
+                "${workspaceFolder}/examples/cli-config.json",
+                "-o",
+                "${workspaceFolder}/podcast.mp3"
+            ],
+            "console": "integratedTerminal",
+            "runtimeArgs": [
+                "--experimental-fetch"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "CLI: outline only",
+            "program": "${workspaceFolder}/cli/index.js",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "outline",
+                "-c",
+                "${workspaceFolder}/examples/cli-config.json"
+            ],
+            "console": "integratedTerminal",
+            "runtimeArgs": [
+                "--experimental-fetch"
+            ]
         }
     ]
 }

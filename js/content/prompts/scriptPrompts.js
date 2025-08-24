@@ -1,48 +1,5 @@
 // Centralized prompt builders for Script generation/verification/improvement
 
-// Verification: Section
-export function buildScriptSectionVerificationSystem() {
-    return `You are a strict podcast script section reviewer.
-
-Check a single generated section against its outline section and the source document.
-
-Priorities:
-1) FACTS: Claims must be grounded in the document. Host is layperson, guest is expert—guest can cite/derive from document without saying "the document".
-2) OUTLINE ADHERENCE: Cover the section's Overview and KEY FACTS. No verbatim copying from outline wording.
-3) CONVERSATION QUALITY: Natural flow, clear turns, engaging. No stage directions. Format is '---' + speaker label lines (HOST:, GUEST:).
-4) CONTINUITY: If previous section provided, first turn alternates speaker; avoid repeating already-covered info; only reference earlier topics if actually present.
-5) CHARACTER: Host asks layperson questions; Guest provides expert, document-grounded answers. Voices consistent with personalities.
-6) FORMAT: Only '---' separators and HOST:/GUEST: labels. No code fences, no section titles, no metadata.
-
-Do NOT assess duration or word count. Duration compliance is handled programmatically outside of this review.
-
-Respond with JSON ONLY:
-{
-  "isValid": boolean,
-  "issues": [
-    {
-      "category": "FACTS"|"OUTLINE"|"CONVERSATION"|"SPEAKER_TURN"|"CONTINUITY"|"CHARACTER"|"FORMAT"|"DURATION",
-      "severity": "critical"|"major"|"minor",
-      "description": string,
-      "evidence": string,                // exact quote(s) from script and/or outline/document reference
-      "fix": string,                     // concrete instruction for how to fix
-      "actions": [string],               // precise edit steps
-      "notes": string                    // rationale
-    }
-  ],
-  "feedback": string,                    // high-level overview for logs (1-3 sentences)
-  "summary": string                      // same as feedback or an additional brief assessment
-}
-
-Example (invalid):
-{
-  "isValid": false,
-  "issues": [],
-  "feedback": "Below target length; expand guest answers with grounded details.",
-  "summary": "Below target length; add grounded detail."
-}`;
-}
-
 // System prompt for script generation based on part type
 export function buildScriptSystem(host, guest, podcastFocus, partType, documentContent = '') {
     const hostName = (host && host.name) ? host.name : 'Host';
@@ -130,12 +87,13 @@ ${((partType || 'section') == "intro") ? `- This is a first, introductory segmen
 - You always MUST introduce GUEST with 1–2 relevant credentials (no resume dump).
 - GUEST MUST acknowledge/thank briefly (1 line max).
 - Set expectations: 1–2 sentences on what listeners will learn.
-- DO NOT end this segment with a question, conclusion, sign-off or summary.` : "" }
+- DO NOT end this segment with a question, conclusion, sign-off or summary; next segment will seamlessly continue from where this one leaves.` : "" }
 ${((partType || 'section') == "section") ? `- This section of the podcast is a regular section, not first, and not the last one in the whole podcast.
 - Guest has been introduced and overall and podcast theme has been set.
-- Start this section with HOST or GUEST, depending on what's natural continuation of the Previous dialogue, provided below.
-- DO NOT end this segment with a question, conclusion, sign-off or summary.` : "" }
+- Seamlessly continue "Previous dialogue" listed below, start HOST or GUEST whichever is more appropriate, naturally continuing the conversation and steering toward this section's outline.
+- DO NOT end this segment with a question, conclusion, sign-off or summary; next segment will seamlessly continue from where this one leaves..` : "" }
 ${((partType || 'section') == "outro") ? `- Start this section with HOST or GUEST, depending on what's natural continuation of the Previous dialogue, provided below.
+- Seamlessly continue "Previous dialogue" listed below, start HOST or GUEST whichever is more appropriate, naturally continuing the conversation and steering toward this section's outline.
 - Include brief recap: 2–3 concise takeaways from this episode.
 - HOST thanks GUEST.
 - GUEST offers a short closing remark (optional pointer or reflection; no new topics).
@@ -198,9 +156,51 @@ Section:
 ${lastSectionContent}`;
 }
 
+// Verification: Section
+export function buildScriptSectionVerificationSystem() {
+  return `You are a strict podcast script section reviewer.
+
+Check a single generated section against its outline section and the source document.
+
+Priorities:
+1) FACTS: Claims must be grounded in the document. Host is layperson, guest is expert—guest can cite/derive from document without saying "the document".
+2) OUTLINE ADHERENCE: Cover the section's Overview and KEY FACTS. No verbatim copying from outline wording.
+3) CONVERSATION QUALITY: Natural flow, clear turns, engaging. No stage directions. Format is '---' + speaker label lines (HOST:, GUEST:).
+4) CONTINUITY: If PREVIOUS SECTION is provided, continue seamlessly from where it left off; avoid repeating already-covered info; only reference earlier topics if actually present.
+5) CHARACTER: Host asks layperson questions; Guest provides expert, document-grounded answers. Voices consistent with personalities.
+6) FORMAT: Only '---' separators and HOST:/GUEST: labels. No code fences, no section titles, no metadata.
+
+Do NOT assess duration or word count. Duration compliance is handled programmatically outside of this review.
+
+Respond with JSON ONLY:
+{
+"isValid": boolean,
+"issues": [
+  {
+    "category": "FACTS"|"OUTLINE"|"CONVERSATION"|"SPEAKER_TURN"|"CONTINUITY"|"CHARACTER"|"FORMAT"|"DURATION",
+    "severity": "critical"|"major"|"minor",
+    "description": string,
+    "evidence": string,                // exact quote(s) from script and/or outline/document reference
+    "fix": string,                     // concrete instruction for how to fix
+    "actions": [string],               // precise edit steps
+    "notes": string                    // rationale
+  }
+],
+"feedback": string,                    // high-level overview for logs (1-3 sentences)
+"summary": string                      // same as feedback or an additional brief assessment
+}
+
+Example (invalid):
+{
+"isValid": false,
+"issues": [],
+"feedback": "Below target length; expand guest answers with grounded details.",
+"summary": "Below target length; add grounded detail."
+}`;
+}
+
 export function buildScriptSectionVerificationUser(section, sectionText, documentContent, totalPodcastDuration, previousSectionText) {
     const wordsTarget = Math.round((section.durationMinutes || 0) * 160);
-    const prev = previousSectionText && previousSectionText.trim() ? `\n--- PREVIOUS SECTION ---\n${previousSectionText}\n` : '';
     return `Review a generated script section. Return JSON only as defined in the system prompt.
 
 --- OUTLINE SECTION (reference) ---
@@ -209,12 +209,17 @@ ${section.content}
 Target duration: ${section.durationMinutes} minutes (~${wordsTarget} words)
 Total podcast duration: ${totalPodcastDuration} minutes
 
---- GENERATED SECTION ---
-${sectionText}
-
 --- DOCUMENT (ground truth) ---
 ${documentContent}
-${prev}`;
+
+${previousSectionText && previousSectionText.trim() ? `
+--- PREVIOUS SECTION ---
+${previousSectionText}
+` : ''}
+
+--- GENERATED SECTION ---
+${sectionText}
+`;
 }
 
 // Verification: Full script
@@ -228,15 +233,14 @@ Check:
 1) REDUNDANCY: Repetition across different sections without adding new value.
 2) TRANSITIONS: Abrupt resets; ensure smooth handoffs between sections.
 3) CONTINUITY: Claims like "as we discussed" that aren’t supported earlier.
-4) SPEAKER_HANDOFF: At section boundaries, avoid same-speaker handoffs or triple same-speaker runs.
-5) FLOW/CHARACTER: Natural overall arc; consistent voices.
+4) FLOW/CHARACTER: Natural overall arc; consistent voices.
 
 Respond with JSON ONLY:
 {
   "isValid": boolean,
   "issues": [
     {
-      "category": "REDUNDANCY"|"TRANSITION"|"CONTINUITY"|"SPEAKER_HANDOFF"|"FLOW"|"CHARACTER",
+      "category": "REDUNDANCY"|"TRANSITION"|"CONTINUITY"|"FLOW"|"CHARACTER",
       "severity": "critical"|"major"|"minor",
       "description": string,
       "evidence": string,           // exact quotes from problematic parts
@@ -270,10 +274,10 @@ Rules:
 - Apply precise, minimal edits to fully address each feedback issue.
 - Preserve unaffected dialogue; keep '---' separators and HOST:/GUEST: labels.
 - Fix duration shortfall first: compute current word count and expand with grounded detail or reduce details to reach the target words (160 wpm). When expanding adding depth, examples, analogies to GUEST answers and short HOST follow-ups. When shortening, strategically rephrase, summarize or completely remove parts to reach the target word count while maintaining as much of the meaning as possible.
-- When removing redundancy, retain any new information or insights that were added, compensate with adding depth, examples, analogies from the ground-truth document, and short HOST follow-ups to maintain the same approximate duration.
+- When removing redundancy, retain any new information or insights that were added, compensate by adding depth, examples, analogies from the ground-truth document, and short HOST follow-ups, and maintain the same approximate duration.
 - Implement each issue's "actions" precisely where indicated by the "evidence" quotes. If locations are ambiguous, fix the first matching occurrence.
-- Address ALL issues: FACTS, OUTLINE, DURATION, CONVERSATION, SPEAKER_TURN, CONTINUITY, CHARACTER, FORMAT.
-- Maintain natural alternation; do not introduce triple same-speaker turns; if previous dialogue implies who spoke last, ensure the first turn here is the other speaker.
+- Address ALL issues: FACTS, OUTLINE, DURATION, CONVERSATION, CONTINUITY, CHARACTER, FORMAT.
+- Maintain natural alternation; do not introduce triple same-speaker turns.
 - Do NOT remove correct content just to add words; extend with relevant, document-grounded detail.
 - Output ONLY the complete improved section; no explanations or code fences.`;
 }

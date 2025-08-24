@@ -274,6 +274,13 @@ class ScriptGenerator {
                 this.progressManager.resetProgress('script-progress');
             }
             this.cancelGeneration = false;
+
+            // Make textarea read-only and add loading animation
+            if (this.scriptTextarea) {
+                this.scriptTextarea.readOnly = true;
+                this.scriptTextarea.classList.add('is-loading');
+                this.scriptTextarea.setAttribute('aria-busy', 'true');
+            }
         } else {
             // Reset UI
             if (this.generateButton) {
@@ -281,6 +288,13 @@ class ScriptGenerator {
             }
             if (this.progressContainer) {
                 this.progressContainer.style.display = 'none';
+            }
+
+            // Restore textarea interactivity and remove loading animation
+            if (this.scriptTextarea) {
+                this.scriptTextarea.readOnly = false;
+                this.scriptTextarea.classList.remove('is-loading');
+                this.scriptTextarea.removeAttribute('aria-busy');
             }
         }
     }
@@ -354,6 +368,25 @@ class ScriptGenerator {
                 const end = (i + 1 < matches.length) ? matches[i + 1].index : block.length;
                 const slice = block.slice(start, end);
 
+                // Determine if this heading has children within the same block (e.g., 3. -> 3.1, 3.2)
+                let hasChildrenInBlock = false;
+                for (let j = i + 1; j < matches.length; j++) {
+                    const childPrefix = matches[i].number + '.';
+                    if (matches[j].number.startsWith(childPrefix)) {
+                        hasChildrenInBlock = true;
+                        break;
+                    }
+                    // Headings are ordered; if the next heading no longer shares the prefix, we can stop checking
+                    if (!matches[j].number.startsWith(matches[i].number)) {
+                        break;
+                    }
+                }
+
+                // If this heading has children, treat it as a container only and skip creating a section for it
+                if (hasChildrenInBlock) {
+                    continue;
+                }
+
                 // Require a duration for a slice to be treated as an actual section
                 const durationMinutes = parseDurationMinutes(slice);
                 if (durationMinutes == null) {
@@ -375,11 +408,25 @@ class ScriptGenerator {
             }
         }
         
+        // Post-process to ensure only leaf sections remain across ALL blocks.
+        // If any section number is a strict prefix of another section's number, treat it as a parent and remove it.
+        const leafSections = sections.filter(function isLeaf(section) {
+            const prefix = section.number + '.';
+            return !sections.some(function hasChild(other) {
+                return other !== section && other.number.startsWith(prefix);
+            });
+        });
+
+        // Recompute total duration from leaf sections only
+        const leafTotalDuration = leafSections.reduce(function sum(acc, s) {
+            return acc + (s.durationMinutes || 0);
+        }, 0);
+
         // Store the total duration for use in prompts
-        this.totalPodcastDuration = totalDuration;
-        console.log('Total parsed sections:', sections.length, '| Total minutes:', totalDuration);
+        this.totalPodcastDuration = leafTotalDuration;
+        console.log('Total parsed sections:', leafSections.length, '| Total minutes:', leafTotalDuration);
         
-        return sections;
+        return leafSections;
     }
     
     /**
@@ -511,6 +558,8 @@ class ScriptGenerator {
             // Update the textarea with the final script
             this.scriptTextarea.value = finalScript;
             this.saveScriptData();
+            // Final progress/size log
+            this.logScriptProgress();
             
             // Show final status notification
             this.notifications.showSuccess('Script generation and verification complete!');
@@ -635,8 +684,9 @@ class ScriptGenerator {
             // Build system prompt for section with document content
             const systemPrompt = this.buildSystemPrompt(characterData, partType, documentContent);
             
-            // Get language setting
-            const scriptLanguage = apiData.models.scriptLanguage || 'english';
+            // Get language setting from scriptData storage
+            const scriptStore = this.storageManager.load('scriptData', {});
+            const scriptLanguage = scriptStore.language || 'english';
             
             // Build user prompt with conversation context
             const userPrompt = this.buildScriptSectionUserPrompt(section, data, partType);
@@ -1171,7 +1221,7 @@ class ScriptGenerator {
      * @param {string} text - Text to append
      */
     appendToScript(text) {
-    
+
         if (this.scriptTextarea) {
             if (this.scriptTextarea.value && !this.scriptTextarea.value.endsWith('\n\n')) {
                 this.scriptTextarea.value += '\n\n';
@@ -1180,7 +1230,49 @@ class ScriptGenerator {
             
             // Scroll to bottom
             this.scriptTextarea.scrollTop = this.scriptTextarea.scrollHeight;
+
+            // Log progress and size metrics after each update
+            this.logScriptProgress();
         }
+    }
+
+    /**
+     * Log progress percentage and script size metrics to console
+     */
+    logScriptProgress() {
+    
+        if (!this.scriptTextarea) {
+            return;
+        }
+        const text = this.scriptTextarea.value || '';
+        const chars = text.length;
+        const words = this.countWords(text);
+        const minutes = (words / 160);
+        const percent = (typeof this._lastProgress === 'number') ? this._lastProgress : 0;
+
+        // Nicely formatted console output
+        const titleStyle = 'font-weight: bold; color: #6c5ce7;';
+        const metricStyle = 'color: #2d3436;';
+        console.group(`%cScript Progress`, titleStyle);
+        console.log('%cPercent:', titleStyle, `${percent}%`);
+        console.log('%cCharacters:', metricStyle, chars);
+        console.log('%cWords:', metricStyle, words);
+        console.log('%cMinutes (approx @160 wpm):', metricStyle, minutes.toFixed(2));
+        console.groupEnd();
+    }
+
+    /**
+     * Count words from a text content
+     * @param {string} text
+     * @returns {number}
+     */
+    countWords(text) {
+    
+        if (!text) {
+            return 0;
+        }
+        const tokens = text.trim().split(/\s+/);
+        return tokens.filter(function onlyWords(t) { return t.length > 0; }).length;
     }
     
     /**

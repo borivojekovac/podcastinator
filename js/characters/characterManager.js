@@ -360,6 +360,11 @@ class CharacterManager {
         const preview = document.getElementById(`${type}-preview`);
         const traits = document.getElementById(`${type}-traits`);
         
+        // If preview UI is not present, safely exit
+        if (!preview || !traits) {
+            return;
+        }
+        
         // No preview if name is empty
         if (!name) {
             preview.style.display = 'none';
@@ -396,12 +401,14 @@ class CharacterManager {
             const statusDiv = document.getElementById(`${type}-status`);
             const statusText = document.getElementById(`${type}-status-text`);
             
-            if (isComplete) {
-                statusDiv.className = 'character-status complete';
-                statusText.textContent = 'Character complete';
-            } else {
-                statusDiv.className = 'character-status incomplete';
-                statusText.textContent = 'Character incomplete';
+            if (statusDiv && statusText) {
+                if (isComplete) {
+                    statusDiv.className = 'character-status complete';
+                    statusText.textContent = 'Character complete';
+                } else {
+                    statusDiv.className = 'character-status incomplete';
+                    statusText.textContent = 'Character incomplete';
+                }
             }
         } else {
             preview.style.display = 'none';

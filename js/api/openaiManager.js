@@ -58,8 +58,7 @@ class OpenAIManager {
             script: this.getSelectedValue('script-model', 'gpt-4.1-mini'),
             scriptVerify: this.getSelectedValue('script-verify-model', 'gpt-4.1-mini'),
             backstory: this.getSelectedValue('backstory-model', 'gpt-4o-mini'),
-            tts: this.getSelectedValue('tts-model', 'tts-1'),
-            scriptLanguage: this.getSelectedValue('script-language', 'english')
+            tts: this.getSelectedValue('tts-model', 'tts-1')
         };
         
         // Persist these initial values to storage
@@ -125,8 +124,7 @@ class OpenAIManager {
             'script-model', 
             'script-verify-model',
             'backstory-model',
-            'tts-model',
-            'script-language'
+            'tts-model'
         ];
 
         modelSelectors.forEach(function(selectorId) {
@@ -153,7 +151,8 @@ class OpenAIManager {
             const languageSelector = document.getElementById('script-language');
             if (languageSelector) {
                 this.populateLanguageOptions(languageSelector);
-                languageSelector.value = this.data.models.scriptLanguage || 'english';
+                const scriptStore = this.storageManager.load('scriptData', {});
+                languageSelector.value = scriptStore.language || 'english';
             }
         }
         
@@ -165,6 +164,16 @@ class OpenAIManager {
                 if (languageSelector) {
                     self.populateLanguageOptions(languageSelector);
                 }
+            });
+        }
+
+        // Listen for changes to language selector to persist to scriptData
+        const languageSelector = document.getElementById('script-language');
+        if (languageSelector) {
+            languageSelector.addEventListener('change', function onLangChange() {
+                const store = self.storageManager.load('scriptData', {}) || {};
+                store.language = languageSelector.value || 'english';
+                self.storageManager.save('scriptData', store);
             });
         }
     }
@@ -182,8 +191,7 @@ class OpenAIManager {
             'script-model': 'script',
             'script-verify-model': 'scriptVerify',
             'backstory-model': 'backstory', 
-            'tts-model': 'tts',
-            'script-language': 'scriptLanguage'
+            'tts-model': 'tts'
         };
 
         const modelKey = modelMap[selectorId];
@@ -206,14 +214,13 @@ class OpenAIManager {
             'script-model': 'script',
             'script-verify-model': 'scriptVerify',
             'backstory-model': 'backstory',
-            'tts-model': 'tts',
-            'script-language': 'scriptLanguage'
+            'tts-model': 'tts'
         };
 
         Object.entries(selectors).forEach(([elementId, modelKey]) => {
         
             const element = document.getElementById(elementId);
-            if (element && element.value) {
+            if (element) {
                 this.data.models[modelKey] = element.value;
             }
         });
@@ -345,18 +352,16 @@ class OpenAIManager {
         });
         
         // Set current value if available
-        if (this.data.models.scriptLanguage) {
-            // Check if the current language is supported by the model
-            const isSupported = languageOptions.some(option => option.value === this.data.models.scriptLanguage);
-            
-            if (isSupported) {
-                selectElement.value = this.data.models.scriptLanguage;
-            } else {
-                // Default to English if current language not supported
-                selectElement.value = 'english';
-                this.data.models.scriptLanguage = 'english';
-                this.saveToStorage();
-            }
+        const scriptStore = this.storageManager.load('scriptData', {});
+        const currentLang = scriptStore.language || 'english';
+        const isSupported = languageOptions.some(function(option) { return option.value === currentLang; });
+        if (isSupported) {
+            selectElement.value = currentLang;
+        } else {
+            selectElement.value = 'english';
+            const updated = this.storageManager.load('scriptData', {}) || {};
+            updated.language = 'english';
+            this.storageManager.save('scriptData', updated);
         }
     }
     
@@ -386,8 +391,7 @@ class OpenAIManager {
                         'script-model': 'script',
                         'script-verify-model': 'scriptVerify',
                         'backstory-model': 'backstory',
-                        'tts-model': 'tts',
-                        'script-language': 'scriptLanguage'
+                        'tts-model': 'tts'
                     }[elementId];
                     
                     if (modelKey) {
