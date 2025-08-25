@@ -4,10 +4,10 @@ import ProgressManager from '../ui/progressManager.js';
 import ScriptVerifier from './scriptVerifier.js';
 import ScriptImprover from './scriptImprover.js';
 import {
-    buildScriptSectionUser,
-    buildConversationSummarySystem,
-    buildConversationSummaryUser,
-    buildScriptSystem
+    getSectionGenerateUser,
+    getSummaryGenerateSystem,
+    getSummaryGenerateUser,
+    getSectionGenerateSystem
 } from './prompts/scriptPrompts.js';
 
 // Composite progress weights (overall)
@@ -489,7 +489,7 @@ class ScriptGenerator {
             let finalScript = this.scriptData;
             let csAttempt = 0;
             const csMaxAttempts = 3;
-            let finalVerificationResult = { isValid: true, feedback: '' };
+            let finalVerificationResult = { isValid: true, summary: '' };
             
             while (csAttempt < csMaxAttempts) {
                 csAttempt++;
@@ -509,7 +509,7 @@ class ScriptGenerator {
                 // Clear the verification notification
                 this.notifications.clearNotification(finalReviewNotificationId);
                 
-                // Log verification feedback
+                // Log verification summary
                 this.logVerificationFeedback(`Final Cross-Section Review (Attempt ${csAttempt})`, finalVerificationResult);
                 // Mark completion of full-script verification phase
                 this.updateCompositeProgress('script-progress', afterFullVerify);
@@ -531,7 +531,7 @@ class ScriptGenerator {
                 // Prefer structured JSON for downstream cross-section improvement if available
                 const csFeedback = (finalVerificationResult && finalVerificationResult.rawJson)
                     ? JSON.stringify(finalVerificationResult.rawJson)
-                    : finalVerificationResult.feedback;
+                    : finalVerificationResult.summary;
 
                 const improvedScript = await this.scriptImprover.improveCrossSectionIssues(
                     finalScript,
@@ -548,6 +548,10 @@ class ScriptGenerator {
                 
                 if (improvedScript && improvedScript.trim() && improvedScript.trim() !== finalScript.trim()) {
                     finalScript = improvedScript;
+                    // Update the UI with the latest cross-section improved script without disturbing user view
+                    this.updateScriptViewPreservingUserState(function updateValue(textarea) {
+                        textarea.value = finalScript;
+                    });
                     this.notifications.showInfo('Cross-section improvements applied. Re-reviewing...');
                 } else {
                     this.notifications.showInfo('Cross-section improvement produced no changes. Stopping further attempts.');
@@ -556,7 +560,9 @@ class ScriptGenerator {
             }
             
             // Update the textarea with the final script
-            this.scriptTextarea.value = finalScript;
+            this.updateScriptViewPreservingUserState(function applyFinal(textarea) {
+                textarea.value = finalScript;
+            });
             this.saveScriptData();
             // Final progress/size log
             this.logScriptProgress();
@@ -605,7 +611,7 @@ class ScriptGenerator {
         const aggregatedSummaries = this.buildAggregatedSummaries();
         const aggregatedTopics = this.buildAggregatedTopics();
 
-        return buildScriptSectionUser(
+        return getSectionGenerateUser(
             section,
             this.totalPodcastDuration,
             this.lastDialogueExchanges,
@@ -743,7 +749,9 @@ class ScriptGenerator {
                 let finalSectionText = sectionText;
                 let attempt = 0;
                 const maxAttempts = 3;
-                let verificationResult = { isValid: true, feedback: '' };
+                let verificationResult = { isValid: true, summary: '' };
+                const candidates = [];
+                const attemptDetails = [];
                 
                 while (attempt < maxAttempts) {
                     attempt++;
@@ -763,11 +771,19 @@ class ScriptGenerator {
                     // Clear the verification notification
                     this.notifications.clearNotification(verificationNotificationId);
                     
-                    // Log verification feedback to console
+                    // Log verification summary to console
                     this.logVerificationFeedback(`Section ${section.number} Verification (Attempt ${attempt})`, verificationResult);
                     // Composite progress: after verification stage
                     const afterVer = this.computeSectionCompositePercent(i, n, SEC_GEN + SEC_VER);
                     this.updateCompositeProgress('script-progress', afterVer);
+
+                    // Compute and record score for this attempt
+                    const score = this.computeSectionScore(verificationResult);
+                    candidates.push({ text: finalSectionText, score: score, verificationResult: verificationResult, attempt: attempt });
+                    attemptDetails.push({ attempt: attempt, score: score, isValid: !!verificationResult.isValid, issuesCount: Array.isArray(verificationResult.issues) ? verificationResult.issues.length : 0 });
+
+                    // Show interim version of script including current best for this section
+                    this.renderInterimWithCurrentSection(finalSectionText);
                     
                     if (verificationResult.isValid) {
                         this.notifications.showInfo(`Section ${section.number} verification passed on attempt ${attempt}.`);
@@ -787,7 +803,7 @@ class ScriptGenerator {
                     // Prefer structured JSON for downstream improvement if available
                     const sectionFeedback = (verificationResult && verificationResult.rawJson)
                         ? JSON.stringify(verificationResult.rawJson)
-                        : verificationResult.feedback;
+                        : verificationResult.summary;
 
                     const improvedSection = await this.improveScriptSection(
                         finalSectionText,
@@ -808,6 +824,8 @@ class ScriptGenerator {
                         // Composite progress: after improvement stage
                         const afterImp = this.computeSectionCompositePercent(i, n, SEC_GEN + SEC_VER + SEC_IMP);
                         this.updateCompositeProgress('script-progress', afterImp);
+                        // Update interim preview after improvement
+                        this.renderInterimWithCurrentSection(finalSectionText);
                     } else {
                         this.notifications.showInfo(`Section ${section.number} did not change after improvement attempt. Stopping further attempts.`);
                         break;
@@ -817,19 +835,27 @@ class ScriptGenerator {
                 const afterSection = this.computeSectionCompositePercent(i, n, 1.0);
                 this.updateCompositeProgress('script-progress', afterSection);
                 
-                // Store this section for summary generation
+                // Choose the best-scored candidate (lowest score wins)
+                const best = this.selectBestSectionCandidate(candidates);
+                const chosenText = best ? best.text : finalSectionText;
+                const chosenVerification = best ? best.verificationResult : verificationResult;
+                const chosenScore = best ? best.score : this.computeSectionScore(verificationResult);
+
+                // Store this section for summary generation, including scoring details
                 this.generatedSections.push({
                     number: section.number,
                     title: section.title,
-                    content: finalSectionText,
-                    verificationResult: verificationResult
+                    content: chosenText,
+                    verificationResult: chosenVerification,
+                    score: chosenScore,
+                    attempts: attemptDetails
                 });
                 
                 // Store the last dialogue exchanges for continuity
-                this.lastDialogueExchanges = this.extractLastExchanges(finalSectionText, 2); // Get last 2 exchanges
+                this.lastDialogueExchanges = this.extractLastExchanges(chosenText, 2); // Get last 2 exchanges
                 
                 // Add section content (no separators needed for TTS processing)
-                this.appendToScript(finalSectionText);
+                this.appendToScript(chosenText);
                 
                 // Save to storage
                 this.saveScriptData();
@@ -865,7 +891,7 @@ class ScriptGenerator {
         const outlineData = this.storageManager.load('outlineData', {});
         const podcastFocus = outlineData.podcastFocus || '';
         
-        return buildScriptSystem(host, guest, podcastFocus, partType, documentContent);
+        return getSectionGenerateSystem(host, guest, podcastFocus, partType, documentContent);
     }
     
     /**
@@ -896,68 +922,66 @@ class ScriptGenerator {
         } catch (error) {
             console.error('Error during section verification:', error);
             // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original section.' };
+            return { isValid: true, summary: 'Verification error. Using original section.' };
         }
     }
-    
+
     /**
-     * Verify the generated script against the outline and target duration
-     * @param {string} scriptText - The generated script text
-     * @param {string} outlineText - Original outline content
-     * @param {string} documentContent - Original document content
-     * @param {Object} characterData - Host and guest character data
-     * @param {Object} apiData - API credentials and model data
-     * @returns {Object} - Verification result with isValid flag and feedback
+     * Compute a numeric score for a verification result.
+     * Lower is better. Severity weights: critical=5, major=3, minor=1.
+     * Unknown severities default to 2.
+     * @param {Object} verificationResult
+     * @returns {number}
      */
-    async verifyScript(scriptText, outlineText, documentContent, characterData, apiData) {
+    computeSectionScore(verificationResult) {
     
-        try {
-            // Delegate to ScriptVerifier
-            const result = await this.scriptVerifier.verifyScript(
-                scriptText, 
-                outlineText, 
-                documentContent, 
-                characterData, 
-                apiData,
-                this.totalPodcastDuration
-            );
-            
-            return result;
-        } catch (error) {
-            console.error('Error during script verification:', error);
-            // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original script.' };
+        if (!verificationResult || !Array.isArray(verificationResult.issues)) {
+            return verificationResult && verificationResult.isValid ? 0 : 1;
         }
+        let score = 0;
+        for (let idx = 0; idx < verificationResult.issues.length; idx++) {
+            const issue = verificationResult.issues[idx] || {};
+            const sev = (issue.severity || '').toLowerCase();
+            let weight = 2;
+            if (sev === 'critical') {
+                weight = 5;
+            } else if (sev === 'major') {
+                weight = 3;
+            } else if (sev === 'minor') {
+                weight = 1;
+            }
+            score += weight;
+        }
+        return score;
     }
-    
+
     /**
-     * Verify the script specifically focusing on cross-section issues
-     * @param {string} scriptText - The generated script text
-     * @param {string} outlineText - Original outline content
-     * @param {string} documentContent - Original document content
-     * @param {Object} characterData - Host and guest character data
-     * @param {Object} apiData - API credentials and model data
-     * @returns {Object} - Verification result with isValid flag and feedback
+     * Select the best section candidate with the lowest score.
+     * Ties are broken by fewer issues (if available) then by later attempt number.
+     * @param {Array} candidates - [{ text, score, verificationResult, attempt }]
+     * @returns {Object|null}
      */
-    async verifyScriptForCrossSectionIssues(scriptText, outlineText, documentContent, characterData, apiData) {
+    selectBestSectionCandidate(candidates) {
     
-        try {
-            // Delegate to ScriptVerifier
-            const result = await this.scriptVerifier.verifyScriptForCrossSectionIssues(
-                scriptText, 
-                outlineText, 
-                documentContent, 
-                characterData, 
-                apiData,
-                this.totalPodcastDuration
-            );
-            
-            return result;
-        } catch (error) {
-            console.error('Error during cross-section verification:', error);
-            // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Cross-section verification error.' };
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return null;
         }
+        let best = candidates[0];
+        for (let i = 1; i < candidates.length; i++) {
+            const c = candidates[i];
+            if (c.score < best.score) {
+                best = c;
+                continue;
+            }
+            if (c.score === best.score) {
+                const cIssues = Array.isArray(c.verificationResult && c.verificationResult.issues) ? c.verificationResult.issues.length : 0;
+                const bIssues = Array.isArray(best.verificationResult && best.verificationResult.issues) ? best.verificationResult.issues.length : 0;
+                if (cIssues < bIssues || (cIssues === bIssues && c.attempt > best.attempt)) {
+                    best = c;
+                }
+            }
+        }
+        return best;
     }
     
     /**
@@ -1098,7 +1122,7 @@ class ScriptGenerator {
      */
     buildConversationSummaryPrompt(lastSection) {
     
-        return buildConversationSummaryUser(lastSection.content);
+        return getSummaryGenerateUser(lastSection.content);
     }
     
     async updateConversationSummary(apiData) {
@@ -1117,7 +1141,7 @@ class ScriptGenerator {
             
             // Create message array
             const messages = [
-                { role: 'system', content: buildConversationSummarySystem() },
+                { role: 'system', content: getSummaryGenerateSystem() },
                 { role: 'user', content: prompt }
             ];
             
@@ -1223,16 +1247,93 @@ class ScriptGenerator {
     appendToScript(text) {
 
         if (this.scriptTextarea) {
-            if (this.scriptTextarea.value && !this.scriptTextarea.value.endsWith('\n\n')) {
-                this.scriptTextarea.value += '\n\n';
-            }
-            this.scriptTextarea.value += text;
-            
-            // Scroll to bottom
-            this.scriptTextarea.scrollTop = this.scriptTextarea.scrollHeight;
-
+            const selfRef = this;
+            this.updateScriptViewPreservingUserState(function append(textarea) {
+                if (textarea.value && !textarea.value.endsWith('\n\n')) {
+                    textarea.value += '\n\n';
+                }
+                textarea.value += text;
+            });
             // Log progress and size metrics after each update
             this.logScriptProgress();
+        }
+    }
+
+    /**
+     * Render interim view combining finalized sections with a pending section text.
+     * Does not persist to storage. Preserves user scroll/selection.
+     * @param {string} currentSectionText
+     */
+    renderInterimWithCurrentSection(currentSectionText) {
+        if (!this.scriptTextarea) {
+            return;
+        }
+        const base = this.getCompiledScriptFromGeneratedSections();
+        const pending = currentSectionText || '';
+        const preview = base ? (base + (base.endsWith('\n\n') ? '' : '\n\n') + pending) : pending;
+        this.updateScriptViewPreservingUserState(function previewSetter(textarea) {
+            textarea.value = preview;
+        });
+    }
+
+    /**
+     * Build combined script from already finalized generated sections.
+     * @returns {string}
+     */
+    getCompiledScriptFromGeneratedSections() {
+        if (!Array.isArray(this.generatedSections) || this.generatedSections.length === 0) {
+            return '';
+        }
+        const parts = [];
+        for (let idx = 0; idx < this.generatedSections.length; idx++) {
+            const s = this.generatedSections[idx];
+            if (s && typeof s.content === 'string' && s.content.trim()) {
+                parts.push(s.content.trim());
+            }
+        }
+        return parts.join('\n\n');
+    }
+
+    /**
+     * Update textarea value while preserving user's scroll position and selection.
+     * Also keeps bottom stickiness if user was at bottom pre-update.
+     * @param {(textarea: HTMLTextAreaElement) => void} mutator
+     */
+    updateScriptViewPreservingUserState(mutator) {
+        const ta = this.scriptTextarea;
+        if (!ta || typeof mutator !== 'function') {
+            return;
+        }
+        const prevScrollTop = ta.scrollTop;
+        const prevScrollHeight = ta.scrollHeight;
+        const prevClientHeight = ta.clientHeight;
+        const atBottom = (prevScrollTop + prevClientHeight) >= (prevScrollHeight - 4);
+        const selStart = ta.selectionStart;
+        const selEnd = ta.selectionEnd;
+        const hadFocus = (document.activeElement === ta);
+
+        mutator(ta);
+
+        // Restore selection if possible
+        try {
+            if (typeof selStart === 'number' && typeof selEnd === 'number') {
+                ta.selectionStart = Math.min(selStart, ta.value.length);
+                ta.selectionEnd = Math.min(selEnd, ta.value.length);
+            }
+        } catch (e) {
+            // ignore selection restore issues
+        }
+
+        // Restore focus
+        if (hadFocus) {
+            ta.focus();
+        }
+
+        // Preserve scroll position unless user was at bottom, then keep pinned to bottom
+        if (atBottom) {
+            ta.scrollTop = ta.scrollHeight;
+        } else {
+            ta.scrollTop = prevScrollTop;
         }
     }
 
@@ -1312,7 +1413,7 @@ class ScriptGenerator {
     /**
      * Log verification feedback to console in a nicely formatted way
      * @param {string} title - Title for the log group
-     * @param {Object} result - Verification result object with isValid and feedback properties
+     * @param {Object} result - Verification result object with isValid and summary properties
      */
     logVerificationFeedback(title, result) {
     
@@ -1330,16 +1431,18 @@ class ScriptGenerator {
             validStyle
         );
         
-        // Log the feedback with nice formatting
-        console.log('%cFeedback:', 'font-weight: bold;');
-        if (typeof result.feedback === 'string') {
-            console.log(`%c${result.feedback}`, feedbackStyle);
+        // Log the summary with nice formatting
+        console.log('%cSummary:', 'font-weight: bold;');
+        console.dir(result, { depth: null });
+        const summaryText = (typeof result.summary === 'string') ? result.summary : (typeof result.feedback === 'string' ? result.feedback : '');
+        if (summaryText) {
+            console.log(`%c${summaryText}`, feedbackStyle);
         } else {
             try {
-                const pretty = JSON.stringify(result.feedback, null, 2);
+                const pretty = JSON.stringify(result.summary || result.feedback || {}, null, 2);
                 console.log(`%c${pretty}`, feedbackStyle);
             } catch (e) {
-                console.dir(result.feedback, { depth: null });
+                console.dir(result.summary || result.feedback, { depth: null });
             }
         }
         
@@ -1387,97 +1490,7 @@ class ScriptGenerator {
         }
     }
     
-    /**
-     * Verify a single script section against its outline section and requirements
-     * @param {string} sectionText - The generated section text
-     * @param {Object} section - The outline section data
-     * @param {Array} previousSections - Array of previously generated sections
-     * @param {string} documentContent - Original document content
-     * @param {Object} characterData - Host and guest character data
-     * @param {Object} apiData - API credentials and model data
-     * @returns {Object} - Verification result with isValid flag and feedback
-     */
-    async verifyScriptSection(sectionText, section, previousSections, documentContent, characterData, apiData) {
     
-        try {
-            // Delegate to ScriptVerifier
-            const result = await this.scriptVerifier.verifyScriptSection(
-                sectionText,
-                section,
-                previousSections, 
-                documentContent, 
-                characterData, 
-                apiData,
-                this.totalPodcastDuration
-            );
-            
-            return result;
-        } catch (error) {
-            console.error('Error during section verification:', error);
-            // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original section.' };
-        }
-    }
-    
-    /**
-     * Verify the generated script against the outline and target duration
-     * @param {string} scriptText - The generated script text
-     * @param {string} outlineText - Original outline content
-     * @param {string} documentContent - Original document content
-     * @param {Object} characterData - Host and guest character data
-     * @param {Object} apiData - API credentials and model data
-     * @returns {Object} - Verification result with isValid flag and feedback
-     */
-    async verifyScript(scriptText, outlineText, documentContent, characterData, apiData) {
-    
-        try {
-            // Delegate to ScriptVerifier
-            const result = await this.scriptVerifier.verifyScript(
-                scriptText, 
-                outlineText, 
-                documentContent, 
-                characterData, 
-                apiData,
-                this.totalPodcastDuration
-            );
-            
-            return result;
-        } catch (error) {
-            console.error('Error during script verification:', error);
-            // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original script.' };
-        }
-    }
-    
-    /**
-     * Verify the script specifically focusing on cross-section issues
-     * @param {string} scriptText - The generated script text
-     * @param {string} outlineText - Original outline content
-     * @param {string} documentContent - Original document content
-     * @param {Object} characterData - Host and guest character data
-     * @param {Object} apiData - API credentials and model data
-     * @returns {Object} - Verification result with isValid flag and feedback
-     */
-    async verifyScriptForCrossSectionIssues(scriptText, outlineText, documentContent, characterData, apiData) {
-    
-        try {
-            // Delegate to ScriptVerifier
-            const result = await this.scriptVerifier.verifyScriptForCrossSectionIssues(
-                scriptText, 
-                outlineText, 
-                documentContent, 
-                characterData, 
-                apiData,
-                this.totalPodcastDuration
-            );
-            
-            return result;
-        } catch (error) {
-            console.error('Error during cross-section verification:', error);
-            // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Cross-section verification error.' };
-        }
-    }
     
     /**
      * Improve cross-section issues in the script based on verification feedback

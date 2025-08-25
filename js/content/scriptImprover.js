@@ -1,10 +1,10 @@
 // Podcastinator App - Script Improvement Module
 import NotificationsManager from '../ui/notifications.js';
 import {
-    buildScriptSectionImproveSystem,
-    buildScriptSectionImproveUser,
-    buildScriptCrossSectionImproveSystem,
-    buildScriptCrossSectionImproveUser
+    getSectionImproveSystem,
+    getSectionImproveUser,
+    getScriptImproveSystem,
+    getScriptImproveUser
 } from './prompts/scriptPrompts.js';
 
 /**
@@ -80,8 +80,8 @@ class ScriptImprover {
             const modelName = apiData.models.script.toLowerCase(); // Use the main script generation model
             
             // Create prompts via centralized builders
-            const systemPrompt = buildScriptSectionImproveSystem();
-            const userPrompt = buildScriptSectionImproveUser(
+            const systemPrompt = getSectionImproveSystem();
+            const userPrompt = getSectionImproveUser(
                 originalSectionText,
                 feedback,
                 section,
@@ -186,13 +186,13 @@ class ScriptImprover {
             const modelName = apiData.models.script.toLowerCase(); // Use the main script generation model
             
             // Create prompts via centralized builders
-            const systemPrompt = buildScriptCrossSectionImproveSystem();
+            const systemPrompt = getScriptImproveSystem();
             
             // Get language setting from scriptData
             const scriptStore2 = this.apiManager.storageManager ? this.apiManager.storageManager.load('scriptData', {}) : {};
             const scriptLanguage = scriptStore2.language || 'english';
             
-            const userPrompt = buildScriptCrossSectionImproveUser(
+            const userPrompt = getScriptImproveUser(
                 originalScriptText,
                 feedback,
                 outlineText,

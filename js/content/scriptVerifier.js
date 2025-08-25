@@ -1,10 +1,10 @@
 // Podcastinator App - Script Verification Module
 import NotificationsManager from '../ui/notifications.js';
 import {
-    buildScriptSectionVerificationSystem,
-    buildScriptSectionVerificationUser,
-    buildScriptCrossSectionVerificationSystem,
-    buildScriptCrossSectionVerificationUser
+    getSectionVerifySystem,
+    getSectionVerifyUser,
+    getScriptVerifySystem,
+    getScriptVerifyUser
 } from './prompts/scriptPrompts.js';
 
 /**
@@ -26,13 +26,13 @@ class ScriptVerifier {
     /**
      * Log verification feedback to console in a nicely formatted way
      * @param {string} title - Title for the log group
-     * @param {Object} result - Verification result object with isValid and feedback properties
+     * @param {Object} result - Verification result object with isValid and summary properties
      */
     logVerificationFeedback(title, result) {
     
         console.group(`🔍 ${title}`);
         console.log(`✅ Valid: ${result.isValid}`);
-        console.log(`💬 Feedback: ${result.feedback}`);
+        console.log(`💬 Summary: ${result.summary || result.feedback || ''}`);
         console.groupEnd();
     }
     
@@ -120,7 +120,7 @@ class ScriptVerifier {
             const wordCount = computeWordCount(sectionText);
 
             // Create prompts via builders
-            const systemPrompt = buildScriptSectionVerificationSystem();
+            const systemPrompt = getSectionVerifySystem();
             // Determine last previous section TEXT (builder expects string)
             let previousSectionText = '';
             if (previousSections && previousSections.length > 0) {
@@ -131,7 +131,7 @@ class ScriptVerifier {
                     previousSectionText = last.content || last.text || '';
                 }
             }
-            const userPrompt = buildScriptSectionVerificationUser(
+            const userPrompt = getSectionVerifyUser(
                 section,
                 sectionText,
                 documentContent,
@@ -169,10 +169,10 @@ class ScriptVerifier {
                     issues: [],
                     wordTarget: wordTarget,
                     wordCount: wordCount,
-                    feedback: 'Verification skipped due to API error.'
+                    summary: 'Verification skipped due to API error.'
                 };
                 ensureDurationIssue(fallback, wordTarget, wordCount);
-                return { isValid: fallback.isValid, feedback: fallback.feedback, issues: fallback.issues, rawJson: fallback };
+                return { isValid: fallback.isValid, summary: fallback.summary, issues: fallback.issues, rawJson: fallback };
             }
             
             const verificationText = data.choices[0]?.message?.content?.trim();
@@ -201,7 +201,7 @@ class ScriptVerifier {
                     // Return with structured issues if available
                     return {
                         isValid: !!resultJson.isValid, // Ensure boolean
-                        feedback: resultJson.feedback || resultJson.summary || 'No specific feedback provided.',
+                        summary: resultJson.summary || 'No specific summary provided.',
                         issues: Array.isArray(resultJson.issues) ? resultJson.issues : [],
                         rawJson: resultJson
                     };
@@ -216,12 +216,12 @@ class ScriptVerifier {
                         issues: [],
                         wordTarget: wordTarget,
                         wordCount: wordCount,
-                        feedback: verificationText.substring(0, 200) + '...'
+                        summary: verificationText.substring(0, 200) + '...'
                     };
                     ensureDurationIssue(minimalJson, wordTarget, wordCount);
                     return {
                         isValid: minimalJson.isValid,
-                        feedback: minimalJson.feedback,
+                        summary: minimalJson.summary,
                         issues: minimalJson.issues,
                         rawJson: minimalJson
                     };
@@ -234,117 +234,19 @@ class ScriptVerifier {
                     issues: [],
                     wordTarget: wordTarget,
                     wordCount: wordCount,
-                    feedback: 'Unable to parse verification result. Using original section.'
+                    summary: 'Unable to parse verification result. Using original section.'
                 };
                 ensureDurationIssue(fallbackJson, wordTarget, wordCount);
-                return { isValid: fallbackJson.isValid, feedback: fallbackJson.feedback, issues: fallbackJson.issues, rawJson: fallbackJson };
+                return { isValid: fallbackJson.isValid, summary: fallbackJson.summary, issues: fallbackJson.issues, rawJson: fallbackJson };
             }
             
         } catch (error) {
             console.error('Error during section verification:', error);
             // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original section.', issues: [], rawJson: null };
+            return { isValid: true, summary: 'Verification error. Using original section.', issues: [], rawJson: null };
         }
     }
     
-    /**
-     * Verify the generated script against the outline and target duration
-     * @param {string} scriptText - The generated script text
-     * @param {string} outlineText - Original outline content
-     * @param {string} documentContent - Original document content
-     * @param {Object} characterData - Host and guest character data
-     * @param {Object} apiData - API credentials and model data
-     * @param {number} totalPodcastDuration - Total podcast duration in minutes
-     * @returns {Object} - Verification result with isValid flag, feedback, and rawJson when available
-     */
-    async verifyScript(scriptText, outlineText, documentContent, characterData, apiData, totalPodcastDuration) {
-    
-        try {
-            // Get model name in lowercase for easier comparison
-            const modelName = apiData.models.scriptVerify.toLowerCase();
-            const isAnthropicStyle = modelName.includes('o3') || modelName.includes('o4');
-            
-            const systemPrompt = buildScriptVerificationSystem();
-            const userPrompt = buildScriptVerificationUser(
-                scriptText,
-                outlineText,
-                documentContent,
-                totalPodcastDuration
-            );
-            
-            // Create messages array
-            const messages = [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ];
-            
-            // Configure options with lower temperature for consistent evaluation
-            const options = {
-                temperature: 0.3
-            };
-            
-            // Get request body using the OpenAIManager helper
-            const requestBody = this.apiManager.createRequestBody(
-                apiData.models.scriptVerify,
-                messages,
-                options
-            );
-            
-            // Create API request with retry logic
-            let data;
-            try {
-                data = await this.apiManager.createChatCompletion(requestBody, apiData.apiKey);
-            } catch (error) {
-                console.error('Script verification failed:', error);
-                return { isValid: true, feedback: 'Verification skipped due to API error. Using original script.' };
-            }
-            
-            const verificationText = data.choices[0]?.message?.content?.trim();
-            
-            // Track token usage if available
-            if (data.usage) {
-                const modelName = apiData.models.scriptVerify;
-                const promptTokens = data.usage.prompt_tokens || 0;
-                const completionTokens = data.usage.completion_tokens || 0;
-                
-                // Track usage via API manager
-                this.apiManager.trackCompletionUsage(modelName, promptTokens, completionTokens);
-            }
-            
-            // Parse verification result
-            try {
-                // Extract JSON from the response (handling cases where there might be text before/after JSON)
-                const jsonMatch = verificationText.match(/{[\s\S]*}/m);
-                if (jsonMatch) {
-                    const resultJson = JSON.parse(jsonMatch[0]);
-                    return {
-                        isValid: !!resultJson.isValid, // Ensure boolean
-                        feedback: resultJson.feedback || resultJson.summary || 'No specific feedback provided.',
-                        rawJson: resultJson
-                    };
-                } else {
-                    // Fallback if no JSON found
-                    const isPositive = verificationText.toLowerCase().includes('valid') || 
-                                      verificationText.toLowerCase().includes('coherent') ||
-                                      verificationText.toLowerCase().includes('good');
-                    return {
-                        isValid: isPositive,
-                        feedback: verificationText.substring(0, 200) + '...',
-                        rawJson: null
-                    };
-                }
-            } catch (error) {
-                console.error('Error parsing verification result:', error);
-                // Default to assuming it's valid to avoid blocking workflow
-                return { isValid: true, feedback: 'Unable to parse verification result. Using original script.', rawJson: null };
-            }
-            
-        } catch (error) {
-            console.error('Error during script verification:', error);
-            // Default to assuming it's valid to avoid blocking workflow
-            return { isValid: true, feedback: 'Verification error. Using original script.', rawJson: null };
-        }
-    }
     
     /**
      * Verify the script specifically focusing on cross-section issues
@@ -363,8 +265,8 @@ class ScriptVerifier {
             const modelName = apiData.models.scriptVerify.toLowerCase();
             const isAnthropicStyle = modelName.includes('o3') || modelName.includes('o4');
             
-            const systemPrompt = buildScriptCrossSectionVerificationSystem();
-            const userPrompt = buildScriptCrossSectionVerificationUser(
+            const systemPrompt = getScriptVerifySystem();
+            const userPrompt = getScriptVerifyUser(
                 scriptText,
                 outlineText,
                 totalPodcastDuration
@@ -394,7 +296,7 @@ class ScriptVerifier {
                 data = await this.apiManager.createChatCompletion(requestBody, apiData.apiKey);
             } catch (error) {
                 console.error('Cross-section verification failed:', error);
-                return { isValid: true, feedback: 'Cross-section verification skipped due to API error.' };
+                return { isValid: true, summary: 'Cross-section verification skipped due to API error.' };
             }
             const verificationText = data.choices[0]?.message?.content?.trim();
             
@@ -416,7 +318,7 @@ class ScriptVerifier {
                     const resultJson = JSON.parse(jsonMatch[0]);
                     return {
                         isValid: !!resultJson.isValid, // Ensure boolean
-                        feedback: resultJson.feedback || resultJson.summary || 'No specific cross-section issues found.',
+                        summary: resultJson.summary || 'No specific cross-section issues found.',
                         rawJson: resultJson
                     };
                 } else {
@@ -426,18 +328,18 @@ class ScriptVerifier {
                                       verificationText.toLowerCase().includes('good');
                     return {
                         isValid: isPositive,
-                        feedback: verificationText.substring(0, 200) + '...',
+                        summary: verificationText.substring(0, 200) + '...',
                         rawJson: null
                     };
                 }
             } catch (error) {
                 console.error('Error parsing cross-section verification result:', error);
-                return { isValid: true, feedback: 'Unable to parse verification result.', rawJson: null };
+                return { isValid: true, summary: 'Unable to parse verification result.', rawJson: null };
             }
             
         } catch (error) {
             console.error('Error during cross-section verification:', error);
-            return { isValid: true, feedback: 'Verification error.', rawJson: null };
+            return { isValid: true, summary: 'Verification error.', rawJson: null };
         }
     }
 }
