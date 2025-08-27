@@ -9,12 +9,13 @@ Goal: Design a sectioned outline for a host "${host.name || 'Host'}" and a guest
 Hard rules (in priority order):
 1) FACT CHECK: Only include topics, claims, and examples that appear in the provided document. No outside knowledge or assumptions.
 2) DURATION: Section durations must sum to EXACTLY ${targetDurationMinutes} minutes. Enforce realistic coverage using 160 words per minute as the speaking rate to gauge feasibility.
-3) CONVERSATION QUALITY: Plan a natural, flowing conversation where the host has layperson understanding and the guest is the subject-matter expert.
+3) DURATION: Section duration MUST NOT exceed 10 minutes; if needed split one section into two or more.
+4) CONVERSATION QUALITY: Plan a natural, flowing conversation where the host has layperson understanding and the guest is the subject-matter expert.
 
 Formatting (CRITICAL):
 - Output ONLY the outline. No code fences, no extra commentary, no totals at the end.
 - Use '---' as a separator before every section block.
-- Each section starts with: "<number>. <Title>" on the first line (e.g., "1. Introduction", "2. Main Theme", "1.1. Subtopic").
+- Each section starts with: "<number>. <Title>" on the first line (e.g., "1. Introduction", "2. Theme one", "3. Theme two").
 - Include a line: "Duration: <number> minutes" (minutes or min are acceptable).
 - Include a line: "Overview: <one concise sentence>".
 - Optionally include a "KEY FACTS:" list with bullets to anchor discussion to document facts. Aim ~1–2 bullets per minute of section duration.
@@ -22,23 +23,18 @@ Formatting (CRITICAL):
 
 Structural guidance:
 - Always include an opening Introduction as the first section and a closing Outro/Conclusion as the last section.
-- Prefer 2–3 main sections (< 15 min), 3–5 (15–30 min), 5–8 (30+ min). Create subsections (1.1, 1.2, etc.) for any section longer than 5 minutes.
+- Think about the story arc when splitting the podcast into sections - all sections should be connected to the previous one and lead to the next one, resulting in a cohesive flow.
 - Avoid redundancy; place each fact/topic once where it best fits the flow.
 - If time is tight, drop lower-priority topics rather than cramming.
 
 Introduction section guidance (CRITICAL):
-- Start with HOST.
-- Welcome listeners to the show and state the overarching topic succinctly.
-- You always MUST introduce GUEST with 1–2 relevant credentials (no resume dump).
-- GUEST MUST acknowledge/thank briefly (1 line max).
-- Set expectations: 1–2 sentences on what listeners will learn.
+- Host welcomes listeners to the show, introduces guest, and states the overarching topic succinctly.
 - Smooth handoff into the first substantive question (avoid generic small talk).
 
 Conclusion section guidance (CRITICAL):
-- Brief recap: 2–3 concise takeaways from the whole episode.
-- HOST thanks GUEST.
-- GUEST offers a short closing remark (optional pointer or reflection; no new topics).
-- Clear HOST sign‑off to listeners. Keep it tight and natural.`;
+- HOST does a brief recap: 2–3 concise takeaways from the whole episode, thanks GUEST, they sign-off.
+- Keep it tight and natural.
+`;
 }
 
 export function buildOutlineGenerationUser(documentContent, podcastDuration, podcastFocus) {

@@ -55,6 +55,8 @@ class ScriptGenerator {
         // Cumulative context across all prior sections
         this.allSectionSummaries = [];
         this.allTopicsCovered = [];
+        // Cross-section review diagnostics (persisted)
+        this.crossSectionReview = null;
         
         // Load existing script data from storage
         const savedData = this.storageManager.load('scriptData', {});
@@ -472,6 +474,10 @@ class ScriptGenerator {
                 await this.generateScriptSection(sections[i], characterData, apiData, partType);
                 
                 // Update conversation summary after each section (except the last one)
+                if (this.cancelGeneration) {
+                    this.cancelGeneration = false;
+                    throw new Error('Script generation cancelled');
+                }
                 if (!isLastSection) {
                     await this.updateConversationSummary(apiData);
                 }
@@ -490,6 +496,8 @@ class ScriptGenerator {
             let csAttempt = 0;
             const csMaxAttempts = 3;
             let finalVerificationResult = { isValid: true, summary: '' };
+            const csCandidates = [];
+            const csAttemptDetails = [];
             
             while (csAttempt < csMaxAttempts) {
                 csAttempt++;
@@ -509,10 +517,22 @@ class ScriptGenerator {
                 // Clear the verification notification
                 this.notifications.clearNotification(finalReviewNotificationId);
                 
+                // Respect cancellation immediately after cross-section verification completes
+                if (this.cancelGeneration) {
+                    this.cancelGeneration = false;
+                    throw new Error('Script generation cancelled');
+                }
+                
                 // Log verification summary
                 this.logVerificationFeedback(`Final Cross-Section Review (Attempt ${csAttempt})`, finalVerificationResult);
                 // Mark completion of full-script verification phase
                 this.updateCompositeProgress('script-progress', afterFullVerify);
+                
+                // Compute and record score for this cross-section attempt
+                const csScore = this.computeSectionScore(finalVerificationResult);
+                csCandidates.push({ text: finalScript, score: csScore, verificationResult: finalVerificationResult, attempt: csAttempt });
+                const csIssuesCount = Array.isArray(finalVerificationResult.issues) ? finalVerificationResult.issues.length : 0;
+                csAttemptDetails.push({ attempt: csAttempt, score: csScore, isValid: !!finalVerificationResult.isValid, issuesCount: csIssuesCount });
                 
                 if (finalVerificationResult.isValid) {
                     this.notifications.showInfo('Final review passed with no cross-section issues found.');
@@ -546,6 +566,12 @@ class ScriptGenerator {
                 // Clear the improvement notification
                 this.notifications.clearNotification(improvementNotificationId);
                 
+                // Respect cancellation immediately after cross-section improvement completes
+                if (this.cancelGeneration) {
+                    this.cancelGeneration = false;
+                    throw new Error('Script generation cancelled');
+                }
+                
                 if (improvedScript && improvedScript.trim() && improvedScript.trim() !== finalScript.trim()) {
                     finalScript = improvedScript;
                     // Update the UI with the latest cross-section improved script without disturbing user view
@@ -559,10 +585,28 @@ class ScriptGenerator {
                 }
             }
             
-            // Update the textarea with the final script
+            // Choose and apply the best cross-section candidate (lowest score wins)
+            const bestCross = this.selectBestSectionCandidate(csCandidates);
+            const chosenFinalScript = bestCross ? bestCross.text : finalScript;
+            // Persist cross-section diagnostics summary similar to per-section attempts
+            this.crossSectionReview = {
+                attempts: csAttemptDetails,
+                chosen: bestCross ? {
+                    attempt: bestCross.attempt,
+                    score: bestCross.score,
+                    issuesCount: Array.isArray(bestCross.verificationResult && bestCross.verificationResult.issues) ? bestCross.verificationResult.issues.length : 0,
+                    isValid: !!(bestCross.verificationResult && bestCross.verificationResult.isValid)
+                } : null,
+                totalAttempts: csAttempt,
+                candidatesCount: Array.isArray(csCandidates) ? csCandidates.length : 0
+            };
+            // Update the textarea with the best-scoring final script
             this.updateScriptViewPreservingUserState(function applyFinal(textarea) {
-                textarea.value = finalScript;
+                textarea.value = chosenFinalScript;
             });
+            finalScript = chosenFinalScript;
+            // Optionally persist cross-section attempt metadata for diagnostics
+            // Not stored per-section; can be extended to store globally if desired
             this.saveScriptData();
             // Final progress/size log
             this.logScriptProgress();
@@ -771,6 +815,12 @@ class ScriptGenerator {
                     // Clear the verification notification
                     this.notifications.clearNotification(verificationNotificationId);
                     
+                    // Respect cancellation immediately after verification completes
+                    if (this.cancelGeneration) {
+                        this.cancelGeneration = false;
+                        throw new Error('Script generation cancelled');
+                    }
+                    
                     // Log verification summary to console
                     this.logVerificationFeedback(`Section ${section.number} Verification (Attempt ${attempt})`, verificationResult);
                     // Composite progress: after verification stage
@@ -818,6 +868,12 @@ class ScriptGenerator {
                     // Clear the improvement notification
                     this.notifications.clearNotification(improvementNotificationId);
                     
+                    // Respect cancellation immediately after improvement completes
+                    if (this.cancelGeneration) {
+                        this.cancelGeneration = false;
+                        throw new Error('Script generation cancelled');
+                    }
+                    
                     if (improvedSection && improvedSection.trim() && improvedSection.trim() !== finalSectionText.trim()) {
                         finalSectionText = this.processScriptText(improvedSection);
                         this.notifications.showInfo(`Section ${section.number} improved. Re-verifying...`);
@@ -851,8 +907,8 @@ class ScriptGenerator {
                     attempts: attemptDetails
                 });
                 
-                // Store the last dialogue exchanges for continuity
-                this.lastDialogueExchanges = this.extractLastExchanges(chosenText, 2); // Get last 2 exchanges
+                // Store the last dialogue turns for continuity
+                this.lastDialogueExchanges = this.extractLastExchanges(chosenText, 3); // Get last 3 turns
                 
                 // Add section content (no separators needed for TTS processing)
                 this.appendToScript(chosenText);
@@ -1075,12 +1131,13 @@ class ScriptGenerator {
     }
     
     /**
-     * Extract the last few exchanges between HOST and GUEST from a dialogue
+     * Extract the last few turns between HOST and GUEST from a dialogue.
+     * Each "turn" is a single speaker block (HOST or GUEST).
      * @param {string} text - The dialogue text to extract from
-     * @param {number} exchangeCount - Number of exchanges to extract (an exchange is HOST+GUEST)
-     * @returns {string} - The extracted exchanges
+     * @param {number} exchangeCount - Number of turns to extract (last N speaker turns)
+     * @returns {string} - The extracted turns, preserving clean formatting
      */
-    extractLastExchanges(text, exchangeCount = 2) {
+    extractLastExchanges(text, exchangeCount = 3) {
     
         if (!text || typeof text !== 'string') {
             return '';
@@ -1093,21 +1150,24 @@ class ScriptGenerator {
         const formattedSegments = [];
         for (let i = 1; i < speakerSegments.length; i += 2) {
             if (i+1 < speakerSegments.length) {
-                formattedSegments.push(`---\n${speakerSegments[i]}${speakerSegments[i+1].trim()}`);
+                // Ensure exactly one newline after the label and normalize body whitespace
+                const label = String(speakerSegments[i] || '');
+                const body = String(speakerSegments[i+1] || '')
+                    .replace(/^\s+/, '')   // remove leading whitespace/newlines
+                    .replace(/\s+$/, '');  // remove trailing whitespace/newlines
+                formattedSegments.push(`---\n${label}\n${body}`);
             }
         }
         
-        // Get the last N exchanges (HOST+GUEST pairs)
-        const totalPairs = Math.floor(formattedSegments.length / 2);
-        const pairsToKeep = Math.min(exchangeCount, totalPairs);
-        
-        if (pairsToKeep === 0) {
-            return '';
+        // Get the last N turns (speaker blocks)
+        const turnsToKeep = Math.min(Math.max(0, exchangeCount | 0), formattedSegments.length);
+        if (turnsToKeep === 0) {
+            return formattedSegments.length > 0 ? formattedSegments[formattedSegments.length - 1] : '';
         }
-        
-        const startIdx = formattedSegments.length - (pairsToKeep * 2);
+        const startIdx = formattedSegments.length - turnsToKeep;
         const lastExchanges = formattedSegments.slice(startIdx);
         
+        // Join with a single blank line between segments
         return lastExchanges.join('\n\n');
     }
     

@@ -71,29 +71,49 @@ export function getSectionGenerateSystem(host, guest, podcastFocus, partType, do
 - You are an expert podcast script writer.
 - You write vivid, engaging, and natural dialogue between HOST and GUEST.
 - You use HOST and GUEST personas and knowledge separation when writing the script.
+- HOST and GUEST do not blindly recite the topic - if their backstory is relevant to the topic, they can use it to build a believable human conversation, but they should not recite it word-for-word.
+- You write script one section at a time, and HOST and GUEST should continue seamlessly from where the previous section left off.
 
 --- Output format (CRITICAL) ---
 - Use blocks starting with '---' on a line by itself.
 - Each block immediately followed by 'HOST:' or 'GUEST:' on its own line, then that speaker's dialogue.
-- No stage directions, no sound cues, no section headers, no metadata, no code fences.
+- No stage directions, no sound cues, no section headers, no metadata, no code fences, no numbered lists.
 - Natural conversation only.
 - Write enough words to meet the section's target at 160 wpm, using depth, examples, and analogies where appropriate.
+- Sections exist for the sole purpose of directing the flow of conversation, but HOST and GUEST shouldn't acknowledge the existence of sections - no sign-offs, hand-overs etc. the transition between sections MUST be seamless. 
+
+--- EXAMPLE OUTPUT ---
+\`\`\`text
+---
+HOST: Welcome to the "Adriatic AI Community" podcast! I'm your host, Bora, and today, we're embarking on an exciting journey exploring the transformative world of Large Language Models, or LLMs. These groundbreaking AI systems process and generate human-like text, revolutionizing how we interact with technology across various domains. At their core, LLMs are trained on vast datasets using self-supervised learning, enabling them to develop a statistical understanding of language patterns, from syntax to semantics. 
+
+I'm thrilled to introduce our guest for this series, Ilya Sutskever, co-founder and Chief Scientist at OpenAI, now CEO of Safe Superintelligence Inc.. Ilya has played a pivotal role in developing the GPT series, which has set the benchmark for LLM capabilities.
+
+---
+GUEST: Thank you, Bora! It’s an honor to be here and share insights on such a fascinating topic. Large Language Models, like those in the GPT series, have fundamentally changed our approach to AI by enabling machines to generate coherent, contextually relevant text. They are trained on diverse text sources, allowing them to mimic human-like responses. For example, models like GPT-3 are trained on hundreds of billions of words, helping them understand context, nuances, and even some reasoning abilities. This extensive training allows them to produce fluent responses that carry a depth of knowledge, despite the fact that they don't "think" like humans do; they predict the next word based on learned patterns, inheriting both knowledge and biases from their training data.
+
+---
+HOST: Absolutely! Over the next few episodes, listeners can expect to dive deep into what LLMs are, their evolution from early chatbots to the sophisticated models we have today, and their implications for coding, creativity, and everyday work. Ilya, could you elaborate on how these models can produce such human-like text? 
+
+---
+GUEST: Certainly! The magic lies in the vast amounts of data they are trained on. This extensive training enables them to generate responses that sound fluent and knowledgeable. It’s crucial to recognize that while they can produce human-like text, they do not possess true understanding; they generate outputs based on patterns learned from the internet's collective writing. 
+\`\`\`
 
 --- SCRIPT SCORING ---
 It is CRITICAL for script to adhere to the following scoring criteria:
 1) DURATION: Write enough words to meet the section's TARGET WORDS.
-2) FACTS: Claims must be grounded in the document. Host is layperson, guest is expert—guest can cite/derive from document without saying "the document".
+2) FACTS: Claims must be grounded in the document and HOST and GUEST backstories. Host is layperson, guest is expert—guest can cite/derive from document without saying "the document".
 3) OUTLINE: Cover the section's Overview and KEY FACTS. No verbatim copying from outline wording.
 4) REDUNDANCY: Avoid going back to already-covered topics, unless explicitly building on top of what was already said, based on the outline.
 5) CONVERSATION: No stage directions. Format is '---' + speaker label lines (HOST:, GUEST:).
-6) CONTINUITY: If LITERAL LAST PART OF THE DIALOGUE is provided, continue seamlessly from where it left off.
+6) CONTINUITY: If PREVIOUS SECTION END is provided, continues seamlessly from where it left off.
 7) CHARACTER: Host asks layperson questions; Guest provides expert, document-grounded answers. Voices consistent with personalities.
 8) FORMAT: Only '---' separators and HOST:/GUEST: labels. No code fences, no section titles, no metadata.
 
 --- HOST PERSONA ---
 When HOST speaks, they should realistically incorporate the HOST personality, speaking style, and backstory.
 **Name**: ${hostName}
-**Knowledge**: Knows own backstory, knows the outline and has general understanding of the topics, and knows things that were shared so far in the conversation. Does not know or can cite DOCUMENT specifics unless the GUEST brings them in.
+**Knowledge**: Knows own backstory, knows the OUTLINE and has general understanding of the topics, and knows things that were shared so far in the conversation. Does not know or can cite DOCUMENT specifics unless the GUEST brings them in. Knows intended direction of conversation, and drives the conversation.
 ${hostPersonality ? `**Personality**: ${hostPersonality}` : ''}
 ${hostStyle ? `**Speaking style**: ${hostStyle}` : ''}
 ${hostBackstory ? `
@@ -105,7 +125,7 @@ ${hostBackstory}
 --- GUEST PERSONA ---
 When GUEST speaks, they should realistically incorporate the GUEST personality, speaking style, and backstory.
 **Name**: ${guestName}
-**Knowledge**: Knows own backstory, knows the DOCUMENT (Ground truth) facts naturally as personal knowledge (never say "the document says"), and knows things that were shared so far in the conversation.
+**Knowledge**: Knows own backstory, knows the DOCUMENT (Ground truth) facts naturally as personal knowledge (never say "the document says"), and knows things that were shared so far in the conversation. Does not know intended direction of conversation, and lets HOST drive the conversation.
 ${guestPersonality ? `**Personality**: ${guestPersonality}` : ''}
 ${guestStyle ? `**Speaking style**: ${guestStyle}` : ''}
 ${guestBackstory ? `
@@ -144,6 +164,7 @@ export function getSectionGenerateUser(section, totalPodcastDuration, lastDialog
 # Task
 Write the ${partType || 'section'} of a podcast conversation following the system rules.
 This is only a part of the full podcast script, and will be concatenated with other sections to form the final script.
+There must be no obvious transition from one part to another, and existence of sections must not be mentioned.
 
 # CRITICAL
 * **TARGET WORDS** ${wordsTarget || 0} words (at 160 words per minute)
@@ -170,10 +191,33 @@ ${topicsSummary}
 ${section.content}
 \`\`\`
 ${lastDialogueExchanges && lastDialogueExchanges.trim() ? `
---- LITERAL LAST PART OF THE DIALOGUE (continue directly from here) ---
+--- PREVIOUS SECTION END (continue directly from here) ---
+\`\`\`markdown
 ${lastDialogueExchanges}
+\`\`\`
 ` : ''}
-`;
+--- Section guidance (CRITICAL) ---
+${partType == "intro" ? `- This in introductory section of the podcast.
+- Start with HOST.
+- Welcome listeners to the show and state the overarching topic succinctly.
+- You always MUST introduce GUEST with 1–2 relevant credentials (no resume dump).
+- GUEST MUST acknowledge/thank briefly (1 line max).
+- Set expectations: 1–2 sentences on what listeners will learn.
+` : ""}${partType == "outro" ? `- This is conclusion section of the podcast.
+- Starts by HOST or GUEST, whatever is more natural continuation of the PREVIOUS SECTION END.
+- If PREVIOUS SECTION ended with a question directed to GUEST, starts by GUEST answering it and in line with the OUTLINE.
+- If PREVIOUS SECTION ended with a question directed to HOST, starts by HOST answering it and in line with the OUTLINE.
+- If PREVIOUS SECTION ended with a statement, starts by either HOST or GUEST, whichever is more appropriate to naturally segue into the OUTLINE.
+- Brief recap: 2–3 concise takeaways from the whole episode.
+- HOST thanks GUEST.
+- GUEST offers a short closing remark (optional pointer or reflection; no new topics).
+- Clear HOST sign‑off to listeners. Keep it tight and natural.
+` : ""}${partType == "section" ? `- Starts by HOST or GUEST, whatever is more natural continuation of the PREVIOUS SECTION END.
+- If PREVIOUS SECTION ended with a question directed to GUEST, starts by GUEST answering it and in line with the OUTLINE.
+- If PREVIOUS SECTION ended with a question directed to HOST, starts by HOST answering it and in line with the OUTLINE.
+- If PREVIOUS SECTION ended with a statement, starts by either HOST or GUEST, whichever is more appropriate to naturally segue into the OUTLINE.
+- Will be followed by natural continuation of dialogue from the next section, so  sign-offs, section boundaries etc. MUST NOT be mentioned.
+` : ""}`;
 }
 
 /**
@@ -270,10 +314,11 @@ export function getSectionImproveSystem() {
   return `You are a targeted podcast script section editor.
 
 Rules:
-- Apply precise, minimal edits to fully address each feedback issue.
+- Apply precise edits to fully address each feedback issue.
 - Preserve unaffected dialogue; keep '---' separators and HOST:/GUEST: labels.
-- Fix duration shortfall first: compute current word count and expand with grounded detail or reduce details to reach the target words (160 wpm). When expanding adding depth, examples, analogies to GUEST answers and short HOST follow-ups. When shortening, strategically rephrase, summarize or completely remove parts to reach the target word count while maintaining as much of the meaning as possible.
+- Fix duration shortfall first: compute current word count and expand with grounded detail or reduce details to reach the target words (160 wpm). When expanding, add depth, examples, analogies to GUEST answers and short HOST follow-ups, feel free to include oppinions grounded in the backstory. When shortening, strategically rephrase, summarize or completely remove parts to reach the target word count, while maintaining as much of the meaning as possible.
 - When removing redundancy, retain any new information or insights that were added, compensate by adding depth, examples, analogies from the ground-truth document, and short HOST follow-ups, and maintain the same approximate duration.
+- Duration changes MUST be toward the target duration, NEVER away from it.
 - Implement each issue's "actions" precisely where indicated by the "evidence" quotes. If locations are ambiguous, fix the first matching occurrence.
 - Address ALL critical and major issues: FACTS, OUTLINE, REDUNDANCY, DURATION, CONVERSATION, CONTINUITY, CHARACTER, FORMAT.
 - Do NOT remove correct content just to add words; extend with relevant, document-grounded detail.
