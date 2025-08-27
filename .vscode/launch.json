@@ -19,10 +19,18 @@
             "cwd": "${workspaceFolder}",
             "args": [
                 "run",
+                "--doc-path",
+                ".\\examples\\LLM Series\\source\\Large Language Models Series - Ep 3 - 0.1 - contents.md",
                 "-c",
-                "${workspaceFolder}/examples/cli-config.json",
+                "${workspaceFolder}/examples/llms-config.json",
                 "-o",
-                "${workspaceFolder}/podcast.mp3"
+                "${workspaceFolder}/Large Language Models Series - Ep 3 - 5.1 - podcast.mp3",
+                "--script-out",
+                "${workspaceFolder}/Large Language Models Series - Ep 3 - 5.0 - script.md",
+                "--config-out",
+                "${workspaceFolder}/Large Language Models Series - Ep 3 - 5.2 - config.json",
+                "--duration",
+                "5"
             ],
             "console": "integratedTerminal",
             "runtimeArgs": [

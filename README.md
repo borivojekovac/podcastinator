@@ -38,6 +38,21 @@ npm start
 5. Enter your OpenAI API key to get started
 6. **Debug Mode**: Add `?debug` to the URL to unlock all sections for testing
 
+### Command-line (CLI)
+
+Prefer headless generation or automation? Use the CLI in `cli/index.js`.
+
+- Docs: see `cli/readme.md`
+- Requirements: Node 18+
+- API key: pass `--api-key` or set the `OPENAI_API_KEY` environment variable (the CLI falls back to it if no key is provided via flags or config)
+
+Example (Windows PowerShell):
+
+```powershell
+$env:OPENAI_API_KEY = "sk-..."
+node ./cli/index.js run -c ./examples/cli-config.json -o ./podcast.mp3
+```
+
 ### Usage
 
 1. **Set up OpenAI API**: Enter your API key
@@ -78,6 +93,7 @@ Podcastinator/
 │   ├── ui/             # UI components and managers
 │   ├── usage/          # API usage tracking
 │   └── utils/          # Utility classes
+├── cli/                # Headless CLI entrypoint and adapters (see cli/readme.md)
 ├── package.json        # Project configuration
 ├── doc/
 │   ├── feature-spec.md # Detailed feature specifications

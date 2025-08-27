@@ -81,6 +81,7 @@ export function getSectionGenerateSystem(host, guest, podcastFocus, partType, do
 - Natural conversation only.
 - Write enough words to meet the section's target at 160 wpm, using depth, examples, and analogies where appropriate.
 - Sections exist for the sole purpose of directing the flow of conversation, but HOST and GUEST shouldn't acknowledge the existence of sections - no sign-offs, hand-overs etc. the transition between sections MUST be seamless. 
+- Never use word "delve".
 
 --- EXAMPLE OUTPUT ---
 \`\`\`text
@@ -323,7 +324,8 @@ Rules:
 - Address ALL critical and major issues: FACTS, OUTLINE, REDUNDANCY, DURATION, CONVERSATION, CONTINUITY, CHARACTER, FORMAT.
 - Do NOT remove correct content just to add words; extend with relevant, document-grounded detail.
 - Feedback format: Prefer structured JSON with an "issues" array of objects: {category, severity, description, evidence, fix, actions[], notes}. If plain text is provided, extract concrete edit steps and apply them as if they were issues.
-- Output ONLY the complete improved section; no explanations or code fences.`;
+- Output ONLY the complete improved section; no explanations or code fences.
+- Never use word "delve".`;
 }
 
 /**
@@ -467,7 +469,8 @@ Rules:
 - When removing redundancy, retain any new information or insights that were added, and you MUST compensate by adding depth, examples, analogies from the ground-truth document, and short HOST follow-ups to maintain the same original word count.
 - Preserve unaffected dialogue; keep '---' separators and HOST:/GUEST: labels.
 - Use the evidence and actions to perform surgical edits.
-- Output ONLY the full improved script; no explanations or code fences.`;
+- Output ONLY the full improved script; no explanations or code fences.
+- Never use word "delve".`;
 }
 
 /**

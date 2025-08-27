@@ -342,7 +342,11 @@ class OutlineGenerator {
                 }
                 
                 // Set outline in textarea
-                this.outlineTextarea.value = finalOutlineText;
+                if (this.outlineTextarea) {
+                    this.outlineTextarea.value = finalOutlineText;
+                }
+                // Always persist to internal state for headless/CLI usage
+                this.outlineData = finalOutlineText;
                 
                 // Save to storage
                 this.saveOutlineData();
@@ -427,15 +431,16 @@ class OutlineGenerator {
      */
     saveOutlineData() {
     
+        const currentOutline = this.outlineTextarea ? (this.outlineTextarea.value || '') : (this.outlineData || '');
         const outlineData = {
-            outline: this.outlineTextarea.value,
+            outline: currentOutline,
             podcastDuration: this.podcastDuration,
             podcastFocus: this.podcastFocus,
             timestamp: new Date().toISOString()
         };
         
         this.storageManager.save('outlineData', outlineData);
-        this.outlineData = this.outlineTextarea.value;
+        this.outlineData = currentOutline;
     }
     
     /**

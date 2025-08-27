@@ -105,6 +105,13 @@ class PodcastinatorService {
             }
             this.storage.save('data', existing);
             this._updateStateFlag('hasApiKey', !!existing.apiKey);
+
+            // Keep OpenAIManager in-memory data in sync for headless/CLI path
+            // so getApiData() returns the latest values without relying on DOM init.
+            if (this.api && this.api.data) {
+                this.api.data.apiKey = existing.apiKey || '';
+                this.api.data.models = existing.models || {};
+            }
         }
         if (config.podcast) {
             const outlineData = this.storage.load('outlineData', {}) || {};
@@ -125,6 +132,16 @@ class PodcastinatorService {
             this.storage.save('outlineData', outlineData);
             this.storage.save('scriptData', scriptData);
             this.storage.save('audioData', audioData);
+
+            // Keep in-memory generators in sync for headless/CLI path
+            if (this.outline) {
+                if (outlineData.podcastDuration !== undefined) {
+                    this.outline.podcastDuration = outlineData.podcastDuration;
+                }
+                if (outlineData.podcastFocus !== undefined) {
+                    this.outline.podcastFocus = outlineData.podcastFocus;
+                }
+            }
         }
     }
 
@@ -182,6 +199,16 @@ class PodcastinatorService {
             outlineData.podcastFocus = focus;
         }
         this.storage.save('outlineData', outlineData);
+
+        // Sync in-memory generator settings for headless path
+        if (this.outline) {
+            if (outlineData.podcastDuration !== undefined) {
+                this.outline.podcastDuration = outlineData.podcastDuration;
+            }
+            if (outlineData.podcastFocus !== undefined) {
+                this.outline.podcastFocus = outlineData.podcastFocus;
+            }
+        }
 
         // Surface coupling: OutlineGenerator expects DOM for notifications/progress; we are not calling init().
         // However, its core API (generateOutline) can run if storage and api data are present.

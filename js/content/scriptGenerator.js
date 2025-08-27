@@ -219,7 +219,10 @@ class ScriptGenerator {
             }
             
             // Reset script content before generation
-            this.scriptTextarea.value = '';
+            if (this.scriptTextarea) {
+                this.scriptTextarea.value = '';
+            }
+            this.scriptData = '';
             this.saveScriptData();
             
             // Generate script section by section
@@ -1456,13 +1459,14 @@ class ScriptGenerator {
      */
     saveScriptData() {
     
+        const currentScript = this.scriptTextarea ? (this.scriptTextarea.value || '') : (this.getCompiledScriptFromGeneratedSections() || this.scriptData || '');
         const scriptData = {
-            script: this.scriptTextarea.value,
+            script: currentScript,
             timestamp: new Date().toISOString()
         };
         
         this.storageManager.save('scriptData', scriptData);
-        this.scriptData = this.scriptTextarea.value;
+        this.scriptData = currentScript;
     }
     
     /**

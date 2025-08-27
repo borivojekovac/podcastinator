@@ -16,10 +16,19 @@ npm install
 
 ## Configuration file and flags
 
-You can pass everything via flags, use a JSON config file, or combine both.
+You can pass everything via flags, use a JSON config file, environment variables, or combine them.
 
 - Flags always override values loaded from `--config`.
+- When no API key is provided via flags or config, the CLI will fall back to the `OPENAI_API_KEY` environment variable.
 - You may omit `-c/--config` entirely if you provide all inputs through flags.
+- UI-exported config (v1) is supported. The CLI auto-normalizes:
+  - `aiParameters.models` → `models`
+  - `contents.document` → `document`
+  - `contents.podcastFocus` → `podcast.focus`
+  - `outline.targetDurationMinutes` → `podcast.duration`
+  - `script.language` → `podcast.language`
+  - `audio.silenceBetweenSpeakersMs` → `podcast.silenceMs`
+  - `hostCharacter`/`guestCharacter` → `characters.host/guest`
 
 Example: `examples/cli-config.json`
 
@@ -60,6 +69,7 @@ Notes:
   - `-c, --config <file>`
 - API key
   - `--api-key <key>`
+  - Or set environment variable `OPENAI_API_KEY` (recommended)
 - Models
   - `--model-outline <name>`
   - `--model-outline-verify <name>`
@@ -86,9 +96,15 @@ Notes:
   - `--guest-speech-rate <n>`
   - `--guest-voice-instructions <s>`
 
+Run-specific output flags:
+- `-o, --out <file>` Write MP3 to path (Node only; default `./podcast.mp3` if omitted)
+- `--outline-out <file>` Write outline text to file
+- `--script-out <file>` Write script text to file
+- `--config-out <file>` Write UI-format config JSON to file
+
 ## Commands
 
-All commands require `-c, --config` pointing to a config JSON file.
+Config is optional on all commands (flags can supply all required inputs).
 
 - `run` — Full pipeline: outline → script → audio
 - `outline` — Outline only
@@ -98,24 +114,42 @@ All commands require `-c, --config` pointing to a config JSON file.
 ### run
 
 ```bash
-node ./index.js run -c ../examples/cli-config.json -o podcast.mp3
+node ./index.js run -c ../examples/cli-config.json \
+  --outline-out ../outline.txt \
+  --script-out ../script.txt \
+  --config-out ../exported-config.json \
+  -o ../podcast.mp3
 ```
 
 - Reads config, loads document and characters.
 - Generates outline, then script, then audio.
-- `-o, --out <file>`: output MP3 path (default: `./podcast.mp3`).
+- Outputs (optional): `--outline-out`, `--script-out`, `--config-out`, and `-o/--out` for MP3.
 
 Override everything from flags (no config file):
 
 ```bash
 node ./index.js run \
-  --api-key sk-... \
+  # API key can be omitted if OPENAI_API_KEY is set in the environment \
   --model-outline gpt-4o-mini --model-script gpt-4o-mini --model-tts tts-1 \
   --duration 30 --language english \
   --host-name Alice --host-voice alloy \
   --guest-name Bob --guest-voice verse \
   --doc-path ../examples/your-source.txt \
+  --outline-out ../outline.txt --script-out ../script.txt --config-out ../exported-config.json \
   -o ../podcast.mp3
+```
+
+Environment variable usage (Windows PowerShell):
+
+```powershell
+$env:OPENAI_API_KEY = "sk-..."
+node ./index.js run -c ../examples/cli-config.json -o ../podcast.mp3
+```
+
+To persist the variable across sessions:
+
+```powershell
+[Environment]::SetEnvironmentVariable("OPENAI_API_KEY","sk-...","User")
 ```
 
 ### outline
@@ -191,7 +225,7 @@ On older Node, the configs enable `--experimental-fetch`.
 
 ## Troubleshooting
 
-- API key errors: ensure `apiKey` is correct and starts with `sk-`.
+- API key errors: ensure a valid key is provided via flag, config, or `OPENAI_API_KEY` env var (recommended). Keys typically start with `sk-`.
 - Document errors: provide `document.path` or `document.content`.
 - TTS errors: ensure TTS model and voice are valid. Check network access.
 - Output not written: ensure `-o` is provided or capture `buffer` yourself.

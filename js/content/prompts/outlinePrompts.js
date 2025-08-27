@@ -73,7 +73,7 @@ Respond with JSON ONLY (no backticks, no prose), using this structure:
       "category": "TIMING"|"FACTS"|"FOCUS"|"STRUCTURE"|"FORMAT",
       "severity": "critical"|"major"|"minor",
       "description": string,                // what is wrong
-      "section": string|null,               // e.g., "1", "2.1"; null if global
+      "section": string|null,               // e.g., "1", "2"; null if global
       "evidence": string,                   // quote/paraphrase from outline and where document contradicts or lacks support
       "fix": string,                        // specific instruction to improver: what to change and how
       "actions": [string],                  // step-by-step edits (surgical)
@@ -124,22 +124,23 @@ Examples:
     {
       "category": "STRUCTURE",
       "severity": "minor",
-      "description": "Section 5 (7 minutes) lacks subsections despite exceeding 5 minutes.",
+      "description": "Section 5 (16 minutes) exceeds 10 minutes.",
       "section": "5",
-      "evidence": "Single block at 7 minutes without 5.1/5.2 segmentation.",
-      "fix": "Split into two subsections (5.1 and 5.2) with 4 and 3 minutes respectively; distribute KEY FACTS accordingly.",
+      "evidence": "Single block at 16 minutes.",
+      "fix": "Split into two (5 and 6) with 9 and 7 minutes respectively; distribute KEY FACTS accordingly.",
       "actions": [
-        "Create '5.1. <Retain Title Part A>' Duration: 4 minutes",
-        "Create '5.2. <Retain Title Part B>' Duration: 3 minutes",
-        "Move advanced points to 5.2"
+        "Create '5 <Retain Title Part A>' Duration: 9 minutes",
+        "Create '6 <Retain Title Part B>' Duration: 7 minutes",
+        "Move advanced points to 6",
+        "Update subsequent section numbering"
       ],
-      "suggestedDuration": 7,
+      "suggestedDuration": 16,
       "notes": "Improves pacing and clarity."
     }
   ],
-  "totalDuration": 28,
+  "totalDuration": 37,
   "targetDuration": 30,
-  "durationDelta": -2,
+  "durationDelta": 7,
   "summary": "Fails duration; contains one ungrounded fact; minor structural adjustment recommended."
 }
 

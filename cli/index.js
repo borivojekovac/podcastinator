@@ -31,8 +31,75 @@ async function readJson(filePath) {
   return JSON.parse(data);
 }
 
+function normalizeConfig(input) {
+  const cfg = { ...(input || {}) };
+
+  // Map aiParameters.models -> models
+  if (!cfg.models && cfg.aiParameters && cfg.aiParameters.models) {
+    cfg.models = { ...cfg.aiParameters.models };
+  }
+
+  // Map contents.document -> document
+  if (!cfg.document && cfg.contents && cfg.contents.document) {
+    const doc = cfg.contents.document;
+    if (typeof doc === 'string') {
+      cfg.document = { content: doc };
+    } else if (doc && typeof doc.content === 'string') {
+      cfg.document = { content: doc.content };
+    } else if (doc && typeof doc.path === 'string') {
+      cfg.document = { path: doc.path };
+    }
+  }
+
+  // Map podcast prefs
+  if (!cfg.podcast) {
+    cfg.podcast = {};
+  }
+  if (cfg.outline && typeof cfg.outline.targetDurationMinutes === 'number') {
+    cfg.podcast.duration = cfg.outline.targetDurationMinutes;
+  }
+  if (cfg.script && typeof cfg.script.language === 'string') {
+    cfg.podcast.language = cfg.script.language;
+  }
+  if (cfg.audio && typeof cfg.audio.silenceBetweenSpeakersMs === 'number') {
+    cfg.podcast.silenceMs = cfg.audio.silenceBetweenSpeakersMs;
+  }
+  if (cfg.contents && typeof cfg.contents.podcastFocus === 'string') {
+    cfg.podcast.focus = cfg.contents.podcastFocus;
+  }
+
+  // Map hostCharacter/guestCharacter -> characters
+  if (!cfg.characters && (cfg.hostCharacter || cfg.guestCharacter)) {
+    cfg.characters = {};
+    if (cfg.hostCharacter) {
+      cfg.characters.host = {
+        name: cfg.hostCharacter.name,
+        voice: cfg.hostCharacter.voice,
+        speechRate: cfg.hostCharacter.speechRate,
+        voiceInstructions: cfg.hostCharacter.voiceInstructions,
+        backstory: cfg.hostCharacter.backstory
+      };
+    }
+    if (cfg.guestCharacter) {
+      cfg.characters.guest = {
+        name: cfg.guestCharacter.name,
+        voice: cfg.guestCharacter.voice,
+        speechRate: cfg.guestCharacter.speechRate,
+        voiceInstructions: cfg.guestCharacter.voiceInstructions,
+        backstory: cfg.guestCharacter.backstory
+      };
+    }
+  }
+
+  return cfg;
+}
+
 async function loadConfigToService(service, cfg) {
   cfg = cfg || {};
+  // Fallback to environment variable if apiKey not provided
+  if (!cfg.apiKey && process.env && process.env.OPENAI_API_KEY) {
+    cfg.apiKey = process.env.OPENAI_API_KEY;
+  }
   // API & Models & podcast prefs
   await service.loadConfig({
     apiKey: cfg.apiKey,
@@ -149,13 +216,73 @@ async function buildConfigFromOptions(opts) {
   return cfg;
 }
 
+function buildUiExportPayloadFromService(service) {
+  const storage = service.storage;
+  const data = storage.load('data', {}) || {};
+  const outlineData = storage.load('outlineData', {}) || {};
+  const scriptData = storage.load('scriptData', {}) || {};
+  const audioData = storage.load('audioData', {}) || {};
+
+  const payload = {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    aiParameters: {
+      models: {
+        backstory: data.models?.backstory || '',
+        outline: data.models?.outline || '',
+        outlineVerify: data.models?.outlineVerify || '',
+        script: data.models?.script || '',
+        scriptVerify: data.models?.scriptVerify || '',
+        tts: data.models?.tts || ''
+      }
+    },
+    contents: {
+      document: data.document || null,
+      podcastFocus: outlineData.podcastFocus || ''
+    },
+    hostCharacter: data.host ? {
+      name: data.host.name || '',
+      personality: data.host.personality || '',
+      voice: data.host.voice || '',
+      speechRate: data.host.speechRate || 1.0,
+      voiceInstructions: data.host.voiceInstructions || '',
+      backstory: data.host.backstory || ''
+    } : undefined,
+    guestCharacter: data.guest ? {
+      name: data.guest.name || '',
+      personality: data.guest.personality || '',
+      voice: data.guest.voice || '',
+      speechRate: data.guest.speechRate || 1.0,
+      voiceInstructions: data.guest.voiceInstructions || '',
+      backstory: data.guest.backstory || ''
+    } : undefined,
+    outline: {
+      targetDurationMinutes: outlineData.podcastDuration || 30,
+      outlineText: outlineData.outline || ''
+    },
+    script: {
+      language: scriptData.language || 'english',
+      scriptText: scriptData.script || ''
+    },
+    audio: {
+      silenceBetweenSpeakersMs: audioData.silenceDuration || 400,
+      mp3Base64: null
+    }
+  };
+
+  return payload;
+}
+
 attachCommonOptions(program.command('run'))
   .description('Run full pipeline (outline -> script -> audio). Flags override config; config is optional.')
   .option('-o, --out <file>', 'Output MP3 file path (Node only)')
+  .option('--outline-out <file>', 'Output outline text file path')
+  .option('--script-out <file>', 'Output script text file path')
+  .option('--config-out <file>', 'Output UI-format config JSON file path')
   .action(async (opts) => {
     try {
       const service = createService();
-      const fileCfg = opts.config ? await readJson(opts.config) : {};
+      const fileCfg = opts.config ? normalizeConfig(await readJson(opts.config)) : {};
       const flagCfg = await buildConfigFromOptions(opts);
       const merged = { ...fileCfg };
       // Deep merge for models/podcast/characters/document
@@ -173,10 +300,22 @@ attachCommonOptions(program.command('run'))
       console.log('\n--- OUTLINE ---\n');
       console.log(outline);
 
+      if (opts.outlineOut) {
+        const outlinePath = path.resolve(opts.outlineOut);
+        await fs.writeFile(outlinePath, outline, 'utf8');
+        console.log(`\nSaved outline to ${outlinePath}`);
+      }
+
       const script = await service.generateScript({
         language: merged?.podcast?.language || 'english'
       });
       console.log('\n--- SCRIPT (length) ---\n', script.length);
+
+      if (opts.scriptOut) {
+        const scriptPath = path.resolve(opts.scriptOut);
+        await fs.writeFile(scriptPath, script, 'utf8');
+        console.log(`\nSaved script to ${scriptPath}`);
+      }
 
       const audioResult = await service.generateAudio({
         silenceMs: merged?.podcast?.silenceMs,
@@ -195,6 +334,13 @@ attachCommonOptions(program.command('run'))
       } else {
         console.log('\nAudio generated (browser path).');
       }
+
+      if (opts.configOut) {
+        const payload = buildUiExportPayloadFromService(service);
+        const cfgOutPath = path.resolve(opts.configOut);
+        await fs.writeFile(cfgOutPath, JSON.stringify(payload, null, 2), 'utf8');
+        console.log(`\nSaved UI config to ${cfgOutPath}`);
+      }
     } catch (err) {
       console.error('Error:', err.message || err);
       process.exitCode = 1;
@@ -206,7 +352,7 @@ attachCommonOptions(program.command('outline'))
   .action(async (opts) => {
     try {
       const service = createService();
-      const fileCfg = opts.config ? await readJson(opts.config) : {};
+      const fileCfg = opts.config ? normalizeConfig(await readJson(opts.config)) : {};
       const flagCfg = await buildConfigFromOptions(opts);
       const merged = { ...fileCfg };
       if (flagCfg.apiKey) merged.apiKey = flagCfg.apiKey;
@@ -231,7 +377,7 @@ attachCommonOptions(program.command('script'))
   .action(async (opts) => {
     try {
       const service = createService();
-      const fileCfg = opts.config ? await readJson(opts.config) : {};
+      const fileCfg = opts.config ? normalizeConfig(await readJson(opts.config)) : {};
       const flagCfg = await buildConfigFromOptions(opts);
       const merged = { ...fileCfg };
       if (flagCfg.apiKey) merged.apiKey = flagCfg.apiKey;
@@ -254,7 +400,7 @@ attachCommonOptions(program.command('audio'))
   .action(async (opts) => {
     try {
       const service = createService();
-      const fileCfg = opts.config ? await readJson(opts.config) : {};
+      const fileCfg = opts.config ? normalizeConfig(await readJson(opts.config)) : {};
       const flagCfg = await buildConfigFromOptions(opts);
       const merged = { ...fileCfg };
       if (flagCfg.apiKey) merged.apiKey = flagCfg.apiKey;
