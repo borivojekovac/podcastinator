@@ -53,12 +53,12 @@ class OpenAIManager {
         
         // Default values in case elements aren't found
         this.data.models = {
-            outline: this.getSelectedValue('outline-model', 'gpt-4o-mini'),
-            outlineVerify: this.getSelectedValue('outline-verify-model', 'gpt-4o-mini'),
-            script: this.getSelectedValue('script-model', 'gpt-4.1-mini'),
-            scriptVerify: this.getSelectedValue('script-verify-model', 'gpt-4.1-mini'),
+            outline: this.getSelectedValue('outline-model', 'o4-mini'),
+            outlineVerify: this.getSelectedValue('outline-verify-model', 'o4-mini'),
+            script: this.getSelectedValue('script-model', 'o3'),
+            scriptVerify: this.getSelectedValue('script-verify-model', 'o4-mini'),
             backstory: this.getSelectedValue('backstory-model', 'gpt-4o-mini'),
-            tts: this.getSelectedValue('tts-model', 'tts-1')
+            tts: this.getSelectedValue('tts-model', 'tts-1-hd')
         };
         
         // Persist these initial values to storage
