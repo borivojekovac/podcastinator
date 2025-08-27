@@ -44,10 +44,10 @@ export function buildOutlineGenerationUser(documentContent, podcastDuration, pod
 ${steer}
 Target duration: ${podcastDuration} minutes (sum of section durations must equal ${podcastDuration}).
 
-Document (sole source of truth — do not invent facts):
+--- DOCUMENT (ground truth) ---
 ${documentContent}
 
-Requirements to satisfy:
+--- CRITICAL REQUIREMENTS ---
 - Ground all sections and KEY FACTS in the document.
 - Make the flow natural for a host (layperson perspective) and a guest (expert perspective).
 - Ensure feasibility at 160 wpm: pick a realistic number of topics per section (about 1–2 bullets per minute).
@@ -161,11 +161,11 @@ export function buildOutlineVerificationUser(outlineText, documentContent, podca
 Target duration: ${podcastDuration}
 ${steer}
 
---- OUTLINE TO REVIEW ---
-${outlineText}
-
 --- DOCUMENT (ground truth) ---
 ${documentContent}
+
+--- OUTLINE TO REVIEW ---
+${outlineText}
 `;
 }
 
@@ -188,15 +188,11 @@ export function buildOutlineImproveUser(originalOutlineText, feedback, documentC
     return `Apply the feedback to improve the outline. Produce ONLY the revised outline.
 
 Target duration: ${podcastDuration} minutes (sum must equal ${podcastDuration}).
-${steer}
 
 --- ORIGINAL OUTLINE ---
 ${originalOutlineText}
 
 --- FEEDBACK (issues to fix) ---
 ${feedback}
-
---- DOCUMENT (ground truth) ---
-${documentContent}
 `;
 }

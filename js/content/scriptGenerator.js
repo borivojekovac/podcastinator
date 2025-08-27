@@ -910,8 +910,8 @@ class ScriptGenerator {
                 // Store the last dialogue turns for continuity
                 this.lastDialogueExchanges = this.extractLastExchanges(chosenText, 3); // Get last 3 turns
                 
-                // Add section content (no separators needed for TTS processing)
-                this.appendToScript(chosenText);
+                // Re-render from finalized sections to avoid duplicating interim content
+                this.renderFinalizedScript();
                 
                 // Save to storage
                 this.saveScriptData();
@@ -1352,6 +1352,21 @@ class ScriptGenerator {
             }
         }
         return parts.join('\n\n');
+    }
+
+    /**
+     * Render the textarea from finalized sections only (no pending/interim content).
+     * Preserves user scroll/selection and logs progress metrics.
+     */
+    renderFinalizedScript() {
+        if (!this.scriptTextarea) {
+            return;
+        }
+        const compiled = this.getCompiledScriptFromGeneratedSections();
+        this.updateScriptViewPreservingUserState(function setFinal(textarea) {
+            textarea.value = compiled;
+        });
+        this.logScriptProgress();
     }
 
     /**
