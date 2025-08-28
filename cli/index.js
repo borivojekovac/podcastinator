@@ -349,6 +349,8 @@ attachCommonOptions(program.command('run'))
 
 attachCommonOptions(program.command('outline'))
   .description('Generate outline. Flags override config; config is optional.')
+  .option('-o, --out <file>', 'Output outline text file path')
+  .option('--outline-out <file>', 'Output outline text file path (alias)')
   .action(async (opts) => {
     try {
       const service = createService();
@@ -366,6 +368,12 @@ attachCommonOptions(program.command('outline'))
         focus: merged?.podcast?.focus
       });
       console.log(outline);
+      const outPath = opts.outlineOut || opts.out;
+      if (outPath) {
+        const outlinePath = path.resolve(outPath);
+        await fs.writeFile(outlinePath, outline, 'utf8');
+        console.log(`Saved outline to ${outlinePath}`);
+      }
     } catch (err) {
       console.error('Error:', err.message || err);
       process.exitCode = 1;
@@ -374,6 +382,11 @@ attachCommonOptions(program.command('outline'))
 
 attachCommonOptions(program.command('script'))
   .description('Generate script (requires outline). Flags override config; config is optional.')
+  .option('--outline-path <file>', 'Path to outline text file (overrides stored outline)')
+  .option('--outline-content <string>', 'Inline outline content (overrides stored outline)')
+  .option('--outline-stdin', 'Read outline content from STDIN (overrides stored outline)')
+  .option('-o, --out <file>', 'Output script text file path')
+  .option('--script-out <file>', 'Output script text file path (alias)')
   .action(async (opts) => {
     try {
       const service = createService();
@@ -386,8 +399,36 @@ attachCommonOptions(program.command('script'))
       if (flagCfg.document) merged.document = flagCfg.document;
       if (flagCfg.characters) merged.characters = { ...(fileCfg.characters || {}), ...flagCfg.characters };
       await loadConfigToService(service, merged);
+
+      // Outline override from CLI
+      let outlineOverride = '';
+      if (opts.outlineContent) {
+        outlineOverride = opts.outlineContent;
+      } else if (opts.outlinePath) {
+        const absOutline = path.resolve(opts.outlinePath);
+        outlineOverride = await fs.readFile(absOutline, 'utf8');
+      } else if (opts.outlineStdin) {
+        const chunks = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(chunk);
+        }
+        outlineOverride = Buffer.concat(chunks.map((c) => Buffer.isBuffer(c) ? c : Buffer.from(c))).toString('utf8');
+      }
+
+      if (outlineOverride && outlineOverride.trim()) {
+        const outlineData = service.storage.load('outlineData', {}) || {};
+        outlineData.outline = outlineOverride;
+        service.storage.save('outlineData', outlineData);
+      }
+
       const script = await service.generateScript({ language: merged?.podcast?.language || 'english' });
       console.log(script);
+      const scriptOutPath = opts.scriptOut || opts.out;
+      if (scriptOutPath) {
+        const absScriptPath = path.resolve(scriptOutPath);
+        await fs.writeFile(absScriptPath, script, 'utf8');
+        console.log(`Saved script to ${absScriptPath}`);
+      }
     } catch (err) {
       console.error('Error:', err.message || err);
       process.exitCode = 1;
