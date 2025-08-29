@@ -438,6 +438,9 @@ attachCommonOptions(program.command('script'))
 attachCommonOptions(program.command('audio'))
   .description('Generate audio (requires script). Flags override config; config is optional.')
   .option('-o, --out <file>', 'Output MP3 file path (Node only)')
+  .option('--script-path <file>', 'Path to script text file (overrides stored script)')
+  .option('--script-content <string>', 'Inline script content (overrides stored script)')
+  .option('--script-stdin', 'Read script content from STDIN (overrides stored script)')
   .action(async (opts) => {
     try {
       const service = createService();
@@ -450,6 +453,28 @@ attachCommonOptions(program.command('audio'))
       if (flagCfg.document) merged.document = flagCfg.document;
       if (flagCfg.characters) merged.characters = { ...(fileCfg.characters || {}), ...flagCfg.characters };
       await loadConfigToService(service, merged);
+
+      // Script override from CLI
+      let scriptOverride = '';
+      if (opts.scriptContent) {
+        scriptOverride = opts.scriptContent;
+      } else if (opts.scriptPath) {
+        const absScript = path.resolve(opts.scriptPath);
+        scriptOverride = await fs.readFile(absScript, 'utf8');
+      } else if (opts.scriptStdin) {
+        const chunks = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(chunk);
+        }
+        scriptOverride = Buffer.concat(chunks.map((c) => Buffer.isBuffer(c) ? c : Buffer.from(c))).toString('utf8');
+      }
+
+      if (scriptOverride && scriptOverride.trim()) {
+        const scriptData = service.storage.load('scriptData', {}) || {};
+        scriptData.script = scriptOverride;
+        service.storage.save('scriptData', scriptData);
+      }
+
       const audioResult = await service.generateAudio({ silenceMs: merged?.podcast?.silenceMs, outputPath: opts.out || '' });
       if (audioResult?.buffer) {
         const absOut = path.resolve(opts.out || 'podcast.mp3');
