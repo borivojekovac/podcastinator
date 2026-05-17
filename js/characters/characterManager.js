@@ -536,41 +536,18 @@ class CharacterManager {
             
             const userPrompt = `Based on this brief description, create a backstory for ${characterName}: "${prompt}"`;
             
-            // Create API request
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiData.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: apiData.models.backstory,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    max_tokens: 1000,
-                    temperature: 0.7
-                })
-            });
+            // Create request body using centralized builder
+            const requestBody = this.apiManager.createRequestBody(
+                apiData.models.backstory,
+                [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                { temperature: 0.7, maxTokens: 1000 }
+            );
             
-            // Handle API response
-            if (!response.ok) {
-                let errorMessage = 'Failed to generate backstory';
-                
-                if (response.status === 401) {
-                    errorMessage = 'Invalid API key. Please check your credentials.';
-                } else if (response.status === 429) {
-                    errorMessage = 'API rate limit exceeded. Please try again later.';
-                } else {
-                    const errorData = await response.json().catch(() => ({}));
-                    errorMessage = errorData.error?.message || errorMessage;
-                }
-                
-                throw new Error(errorMessage);
-            }
-            
-            const data = await response.json();
+            // Create API request using centralized API manager
+            const data = await this.apiManager.createChatCompletion(requestBody, apiData.apiKey);
             const backstory = data.choices[0]?.message?.content?.trim();
             
             // Track token usage if available

@@ -4,6 +4,7 @@ import ProgressManager from '../ui/progressManager.js';
 import Mp3Encoder from '../utils/mp3Encoder.js';
 import RetryManager from '../utils/retryManager.js';
 import AudioBlobStore from '../utils/idbAudio.js';
+import ModelCatalog from '../utils/modelCatalog.js';
 
 /**
  * Handles the generation of podcast audio using OpenAI TTS
@@ -13,6 +14,7 @@ class AudioGenerator {
         this.storageManager = storageManager;
         this.contentStateManager = contentStateManager;
         this.apiManager = apiManager;
+        this.modelCatalog = new ModelCatalog();
         this.notifications = new NotificationsManager();
         this.progressManager = new ProgressManager();
         
@@ -494,8 +496,8 @@ class AudioGenerator {
             // Use RetryManager to handle retries with exponential backoff
             const audioBuffer = await this.retryManager.execute(
                 async () => {
-                    // Determine if we're using the GPT-4o-mini-TTS model
-                    const isGpt4oMiniTts = apiData.models.tts === 'gpt-4o-mini-tts';
+                    // Get TTS model metadata
+                    const ttsModelMeta = this.modelCatalog.getModel(apiData.models.tts);
                     
                     // Get character data for voice instructions and speech rate
                     let voiceInstructions = null;
@@ -513,8 +515,8 @@ class AudioGenerator {
                     }
                     
                     if (characterType) {
-                        // Get voice instructions if available for GPT-4o-mini-TTS
-                        if (isGpt4oMiniTts && characters[characterType].voiceInstructions) {
+                        // Get voice instructions if available for models that support them
+                        if (ttsModelMeta && ttsModelMeta.supportsTtsInstructions && characters[characterType].voiceInstructions) {
                             voiceInstructions = characters[characterType].voiceInstructions;
                         }
                         
@@ -537,13 +539,13 @@ class AudioGenerator {
                         language: scriptLanguage
                     };
                     
-                    // Add voice instructions if available for GPT-4o-mini-TTS
-                    if (isGpt4oMiniTts && voiceInstructions) {
+                    // Add voice instructions if available for models that support them
+                    if (ttsModelMeta && ttsModelMeta.supportsTtsInstructions && voiceInstructions) {
                         requestBody.instructions = voiceInstructions;
                     }
                     
-                    // Add speech rate if available (only for TTS-1 and TTS-1-HD models)
-                    if (speechRate && (apiData.models.tts === 'tts-1' || apiData.models.tts === 'tts-1-hd')) {
+                    // Add speech rate if available for models that support it
+                    if (speechRate && ttsModelMeta && ttsModelMeta.supportsTtsSpeed) {
                         requestBody.speed = speechRate;
                     }
                     

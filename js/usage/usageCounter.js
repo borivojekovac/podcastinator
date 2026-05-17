@@ -1,35 +1,17 @@
 // Podcastinator App - Usage Counter
 import StorageManager from '../utils/storage.js';
 import NotificationsManager from '../ui/notifications.js';
+import ModelCatalog from '../utils/modelCatalog.js';
 
 class UsageCounter {
     constructor(storageManager, apiManager) {
         this.storageManager = storageManager;
         this.apiManager = apiManager;
         this.notifications = new NotificationsManager();
+        this.modelCatalog = new ModelCatalog();
         
-        // Default model costs per 1k tokens (in USD)
-        this.defaultCosts =
-        {
-            // Content models
-            "gpt-5": { "input": 0.00125, "output": 0.01000 },
-            "gpt-5-mini": { "input": 0.00025, "output": 0.00200 },
-            "gpt-5-nano": { "input": 0.00005, "output": 0.00040 },
-            'gpt-4.1': { input: 0.01, output: 0.03 },
-            'gpt-4.1-mini': { input: 0.005, output: 0.015 },
-            'gpt-4.1-nano': { input: 0.0025, output: 0.0075 },
-            'o3': { input: 0.005, output: 0.015 },
-            'o4-mini': { input: 0.0025, output: 0.0075 },
-            'gpt-4o': { input: 0.005, output: 0.015 },
-            'gpt-4o-mini': { input: 0.0015, output: 0.005 },
-            'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
-            'gpt-3.5-turbo-16k': { input: 0.001, output: 0.002 },
-            
-            // Audio models
-            'tts-1': 0.015,  // per 1k characters
-            'tts-1-hd': 0.03, // per 1k characters
-            'gpt-4o-mini-tts': 0.015  // per 1k characters
-        };
+        // Build default costs from model catalog
+        this.defaultCosts = this.buildDefaultCosts();
         
         // Load usage data from storage
         const savedUsage = this.storageManager.load('usageData', {});
@@ -40,6 +22,31 @@ class UsageCounter {
         this.costs = savedCosts.costs || JSON.parse(JSON.stringify(this.defaultCosts));
         
         this.isDrawerOpen = false;
+    }
+
+    /**
+     * Build default costs from model catalog
+     * @returns {Object} Default costs object
+     */
+    buildDefaultCosts() {
+
+        const costs = {};
+        
+        // Iterate through all models in the catalog
+        Object.entries(this.modelCatalog.models).forEach(([modelId, meta]) => {
+            if (meta.category === 'text') {
+                // Text models have input/output costs
+                costs[modelId] = {
+                    input: meta.costPer1kInput || 0,
+                    output: meta.costPer1kOutput || 0
+                };
+            } else if (meta.category === 'tts') {
+                // TTS models have per-character costs
+                costs[modelId] = meta.costPer1kChars || 0;
+            }
+        });
+        
+        return costs;
     }
 
     /**
@@ -185,8 +192,8 @@ class UsageCounter {
         tableBody.innerHTML = '';
         let totalCost = 0;
         
-        // Define TTS models list including gpt-4o-mini-tts
-        const ttsModels = ['tts-1', 'tts-1-hd', 'gpt-4o-mini-tts'];
+        // Get TTS models from catalog
+        const ttsModels = this.modelCatalog.getTtsModels();
         
         // Combine all model names from both costs and usage
         const allModels = new Set([
@@ -260,8 +267,11 @@ class UsageCounter {
      */
     updateCost(model, type, value) {
     
-        // Handle TTS models (single value)
-        if (model === 'tts-1' || model === 'tts-1-hd') {
+        // Get model metadata to determine if it's TTS
+        const modelMeta = this.modelCatalog.getModel(model);
+        
+        if (modelMeta && modelMeta.category === 'tts') {
+            // Handle TTS models (single value)
             this.costs[model] = value;
         } else {
             // Handle language models (input/output values)

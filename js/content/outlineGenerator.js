@@ -240,23 +240,15 @@ class OutlineGenerator {
             // Build user prompt with document content
             const userPrompt = this.buildUserPrompt(documentContent);
             
-            // Get model name in lowercase for easier comparison
-            const modelName = apiData.models.outline.toLowerCase();
-            const isAnthropicStyle = modelName.includes('o3') || modelName.includes('o4');
-            
             // Prepare request body with model-specific parameters
-            const requestBody = {
-                model: apiData.models.outline,
-                messages: [
+            const requestBody = this.apiManager.createRequestBody(
+                apiData.models.outline,
+                [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
-                ]
-            };
-            
-            // Handle model-specific parameters
-            if (!isAnthropicStyle) {
-                requestBody.temperature = 0.7; // Only set for non-Anthropic models
-            }
+                ],
+                { temperature: 0.7 }
+            );
             
             // generateOutline: Call OpenAI API with retry logic
             const responseData = await this.apiManager.createChatCompletion(requestBody, apiData.apiKey);

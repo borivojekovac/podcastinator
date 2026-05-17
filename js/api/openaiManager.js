@@ -2,12 +2,14 @@
 import NotificationsManager from '../ui/notifications.js';
 import LanguageSupport from '../utils/languageSupport.js';
 import RetryManager from '../utils/retryManager.js';
+import ModelCatalog from '../utils/modelCatalog.js';
 
 class OpenAIManager {
     constructor(storageManager, contentStateManager) {
         this.storageManager = storageManager;
         this.contentStateManager = contentStateManager;
         this.notifications = new NotificationsManager();
+        this.modelCatalog = new ModelCatalog();
         
         // Load models data from storage
         const savedData = this.storageManager.load('data', {});
@@ -28,6 +30,9 @@ class OpenAIManager {
             apiKey: savedData.apiKey || '',
             models: savedData.models || {}
         };
+        
+        // Track if user has explicitly set non-deprecated models
+        this.hasValidatedModels = false;
     }
 
     /**
@@ -35,6 +40,9 @@ class OpenAIManager {
      */
     init() {
     
+        // Populate model selectors from catalog
+        this.populateAllModelSelectors();
+        
         // Initialize models from DOM if no stored values exist
         this.initializeModelsFromDOM();
         this.setupModelSelectionListeners();
@@ -51,14 +59,19 @@ class OpenAIManager {
             return;
         }
         
-        // Default values in case elements aren't found
+        // Default values using model catalog
+        const defaultOutline = this.modelCatalog.getDefaultModel('outline');
+        const defaultScript = this.modelCatalog.getDefaultModel('script');
+        const defaultBackstory = this.modelCatalog.getDefaultModel('backstory');
+        const defaultTts = this.modelCatalog.getDefaultModel('tts');
+        
         this.data.models = {
-            outline: this.getSelectedValue('outline-model', 'o4-mini'),
-            outlineVerify: this.getSelectedValue('outline-verify-model', 'o4-mini'),
-            script: this.getSelectedValue('script-model', 'o3'),
-            scriptVerify: this.getSelectedValue('script-verify-model', 'o4-mini'),
-            backstory: this.getSelectedValue('backstory-model', 'gpt-4o-mini'),
-            tts: this.getSelectedValue('tts-model', 'tts-1-hd')
+            outline: this.getSelectedValue('outline-model', defaultOutline),
+            outlineVerify: this.getSelectedValue('outline-verify-model', defaultOutline),
+            script: this.getSelectedValue('script-model', defaultScript),
+            scriptVerify: this.getSelectedValue('script-verify-model', defaultScript),
+            backstory: this.getSelectedValue('backstory-model', defaultBackstory),
+            tts: this.getSelectedValue('tts-model', defaultTts)
         };
         
         // Persist these initial values to storage
@@ -90,6 +103,45 @@ class OpenAIManager {
         }
         
         return defaultValue;
+    }
+
+    /**
+     * Populate model selector with options from catalog
+     * @param {string} selectId - ID of the select element
+     * @param {string} category - 'text' or 'tts'
+     */
+    populateModelSelector(selectId, category) {
+
+        const selectElement = document.getElementById(selectId);
+        if (!selectElement) {
+            return;
+        }
+
+        selectElement.innerHTML = '';
+        
+        // Get all options including deprecated
+        const options = this.modelCatalog.getAllSelectOptions(category);
+        
+        options.forEach(function addOption(option) {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            optionElement.disabled = option.deprecated;
+            selectElement.appendChild(optionElement);
+        });
+    }
+
+    /**
+     * Populate all model selectors
+     */
+    populateAllModelSelectors() {
+
+        this.populateModelSelector('backstory-model', 'text');
+        this.populateModelSelector('outline-model', 'text');
+        this.populateModelSelector('outline-verify-model', 'text');
+        this.populateModelSelector('script-model', 'text');
+        this.populateModelSelector('script-verify-model', 'text');
+        this.populateModelSelector('tts-model', 'tts');
     }
 
     /**
@@ -243,7 +295,30 @@ class OpenAIManager {
     }
 
     /**
-     * Validate OpenAI API key
+     * Check if any selected models are deprecated
+     * @returns {Array} Array of deprecated model selections
+     */
+    checkDeprecatedModels() {
+
+        const deprecatedModels = [];
+        const modelKeys = ['outline', 'outlineVerify', 'script', 'scriptVerify', 'backstory', 'tts'];
+        
+        modelKeys.forEach(key => {
+            const modelId = this.data.models[key];
+            if (modelId && this.modelCatalog.isDeprecated(modelId)) {
+                deprecatedModels.push({
+                    key: key,
+                    modelId: modelId,
+                    name: this.modelCatalog.getModel(modelId)?.name || modelId
+                });
+            }
+        });
+        
+        return deprecatedModels;
+    }
+
+    /**
+     * Validate OpenAI API key and model selections
      */
     async validateApiKey() {
     
@@ -259,6 +334,14 @@ class OpenAIManager {
 
         if (!apiKey.startsWith('sk-')) {
             this.notifications.showError('Invalid API key format. OpenAI keys start with "sk-"');
+            return;
+        }
+
+        // Check for deprecated models before validation
+        const deprecatedModels = this.checkDeprecatedModels();
+        if (deprecatedModels.length > 0) {
+            const modelList = deprecatedModels.map(m => `${m.key}: ${m.name}`).join(', ');
+            this.notifications.showError(`Please update deprecated models before proceeding: ${modelList}`);
             return;
         }
 
@@ -281,6 +364,7 @@ class OpenAIManager {
                 // Save all form data including models
                 this.data.apiKey = apiKey;
                 this.saveAllModelSelections();
+                this.hasValidatedModels = true;
                 this.notifications.showSuccess('API key validated successfully! Settings saved.');
                 
                 // Update content state to indicate we have valid API key
@@ -437,16 +521,6 @@ class OpenAIManager {
     }
     
     /**
-     * Check if a model is Anthropic-style (Claude/o3/o4)
-     * @param {string} modelName - Name of the model
-     * @returns {boolean} - True if model is Anthropic-style
-     */
-    isAnthropicStyleModel(modelName) {
-    
-        return modelName.toLowerCase().includes('o3') || modelName.toLowerCase().includes('o4');
-    }
-    
-    /**
      * Create a request body for OpenAI API calls with model-specific parameters
      * @param {string} modelName - Name of the model to use
      * @param {Array} messages - Array of message objects with role and content
@@ -455,8 +529,8 @@ class OpenAIManager {
      */
     createRequestBody(modelName, messages, options = {}) {
     
-        // Check if this is an Anthropic-style model
-        const isAnthropicStyle = this.isAnthropicStyleModel(modelName);
+        // Get model metadata from catalog
+        const modelMeta = this.modelCatalog.getModel(modelName);
         
         // Start with basic request body that works for all models
         const requestBody = {
@@ -464,18 +538,15 @@ class OpenAIManager {
             messages: messages
         };
         
-        // Add temperature if specified in options
-        if (!isAnthropicStyle && options.temperature !== undefined) {
+        // Add temperature if the model supports it
+        if (modelMeta && modelMeta.supportsTemperature && options.temperature !== undefined) {
             requestBody.temperature = options.temperature;
         }
         
-        // Handle token limits differently based on model type
-        if (options.maxTokens !== undefined) {
-            if (isAnthropicStyle) {
-                requestBody.max_completion_tokens = options.maxTokens;
-            } else {
-                requestBody.max_tokens = options.maxTokens;
-            }
+        // Handle token limits based on model metadata
+        if (options.maxTokens !== undefined && modelMeta) {
+            const tokenField = modelMeta.tokenLimitField || 'max_tokens';
+            requestBody[tokenField] = options.maxTokens;
         }
         
         // Add any other options that are model-agnostic

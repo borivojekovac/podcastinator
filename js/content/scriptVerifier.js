@@ -50,10 +50,6 @@ class ScriptVerifier {
     async verifyScriptSection(sectionText, section, previousSections, documentContent, characterData, apiData, totalPodcastDuration) {
     
         try {
-            // Get model name in lowercase for easier comparison
-            const modelName = apiData.models.scriptVerify.toLowerCase();
-            const isAnthropicStyle = modelName.includes('o3') || modelName.includes('o4');
-            
             // Helpers: word counting and duration issue injection
             function computeWordCount(input) {
             
@@ -261,10 +257,6 @@ class ScriptVerifier {
     async verifyScriptForCrossSectionIssues(scriptText, outlineText, documentContent, characterData, apiData, totalPodcastDuration) {
     
         try {
-            // Get model name in lowercase for easier comparison
-            const modelName = apiData.models.scriptVerify.toLowerCase();
-            const isAnthropicStyle = modelName.includes('o3') || modelName.includes('o4');
-            
             const systemPrompt = getScriptVerifySystem();
             const userPrompt = getScriptVerifyUser(
                 scriptText,
